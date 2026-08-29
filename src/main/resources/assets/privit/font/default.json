@@ -1,0 +1,11 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "privit:font/cube.png",
+      "height": 16,
+      "ascent": 11,
+      "chars": ["\uE000"]
+    }
+  ]
+}

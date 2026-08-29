@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "AB ",
+    "CC ",
+    "CC "
+  ],
+  "key": {
+    "A": {
+      "item": "minecraft:paper"
+    },
+    "B": {
+      "item": "minecraft:book"
+    },
+    "C": {
+      "tag": "minecraft:planks"
+    }
+  },
+  "result": {
+    "id": "privit:region_table",
+    "count": 1
+  }
+}

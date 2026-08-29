@@ -1,0 +1,34 @@
+{
+	"schemaVersion": 1,
+	"id": "privit",
+	"version": "${version}",
+	"name": "Privit",
+	"description": "Protect your territory",
+	"authors": [
+		"Slarrties"
+	],
+	"contact": {
+		"homepage": "https://modrinth.com/project/privit",
+		"sources": "https://github.com/Slarrties/privit-fabric"
+	},
+	"license": "All Rights Reserved",
+	"icon": "assets/privit/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [ "dev.slarrties.privit.PrivitMod" ],
+		"client": [ "dev.slarrties.privit.client.PrivitClient" ],
+		"server": ["dev.slarrties.privit.server.PrivitServer"]
+	},
+	"mixins": [
+		"privit.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.18.1",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"modmenu": "*"
+	}
+}

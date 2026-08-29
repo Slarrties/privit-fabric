@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "privit:block/region_table", "y": 180 },
+    "facing=east": { "model": "privit:block/region_table", "y": 270 },
+    "facing=south": { "model": "privit:block/region_table", "y": 0 },
+    "facing=west": { "model": "privit:block/region_table", "y": 90 }
+  }
+}
