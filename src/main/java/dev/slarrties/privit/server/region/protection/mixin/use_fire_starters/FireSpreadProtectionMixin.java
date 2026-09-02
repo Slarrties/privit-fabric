@@ -7,9 +7,11 @@ import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
+import dev.slarrties.privit.server.tracking.context.BlockFallContext;
 import dev.slarrties.privit.server.tracking.context.FireSpreadContext;
 import dev.slarrties.privit.server.tracking.protection.FireOriginTracker;
 import dev.slarrties.privit.server.tracking.protection.ExplosionOriginTracker;
+import dev.slarrties.privit.server.tracking.protection.BlockFallOriginTracker;
 
 import net.minecraft.block.BlockState;
 import net.minecraft.block.FireBlock;
@@ -32,7 +34,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.UUID;
 
-@AssociatedRule(Rule.USE_FIRE_STARTERS)
+@AssociatedRule({Rule.USE_FIRE_STARTERS, Rule.CAUSE_BLOCK_FALL})
 @Mixin(FireBlock.class)
 public abstract class FireSpreadProtectionMixin {
 
@@ -115,13 +117,19 @@ public abstract class FireSpreadProtectionMixin {
                 FireOriginTracker fireTracker = WorldRegistry.get(serverWorld)
                         .getTrackerManager()
                         .getFireOriginTracker();
-                UUID responsible = fireTracker.getResponsible(serverWorld, context.getSourcePos());
+                UUID responsible = fireTracker.getResponsible(context.getSourcePos());
 
                 if(responsible != null) {
                     boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.USE_FIRE_STARTERS, pos, serverWorld);
 
-                    if(allowed) {
+                    if (allowed) {
                         fireTracker.propagate(context.getSourcePos(), pos);
+
+                        BlockFallOriginTracker blockFallTracker = WorldRegistry.get(serverWorld)
+                                .getTrackerManager()
+                                .getBlockFallOriginTracker();
+                        blockFallTracker.record(pos, responsible);
+                        BlockFallContext.push(responsible, pos);
                     } else {
                         this.sendDenyNotificationIfPossible(serverWorld, pos);
                         ci.cancel();
@@ -131,30 +139,67 @@ public abstract class FireSpreadProtectionMixin {
         }
     }
 
-    @Inject(method = "trySpreadingFire", at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/world/World;removeBlock(Lnet/minecraft/util/math/BlockPos;Z)Z"
-    ), cancellable = true)
-    private void trackRemoveBlockInTrySpreadingFire(World world, BlockPos pos, int spreadFactor, Random random, int currentAge, CallbackInfo ci) {
-        if(world instanceof ServerWorld serverWorld) {
-            FireSpreadContext context = FireSpreadContext.getCurrent();
+    @Inject(
+            method = "trySpreadingFire",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/world/World;setBlockState(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;I)Z",
+                    shift = At.Shift.AFTER
+            )
+    )
+    private void popFallAfterFireReplace(World world, BlockPos pos, int spreadFactor,
+                                         Random random, int currentAge, CallbackInfo ci) {
+        BlockFallContext.pop();
+    }
 
-            if(context.getTargetPos().equals(pos)) {
-                FireOriginTracker fireTracker = WorldRegistry.get(serverWorld)
-                        .getTrackerManager()
-                        .getFireOriginTracker();
-                UUID responsible = fireTracker.getResponsible(serverWorld, context.getSourcePos());
+    @Inject(
+            method = "trySpreadingFire",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/world/World;removeBlock(Lnet/minecraft/util/math/BlockPos;Z)Z"
+            ),
+            cancellable = true
+    )
+    private void trackRemoveBlockInTrySpreadingFire(World world, BlockPos pos, int spreadFactor,
+                                                    Random random, int currentAge, CallbackInfo ci) {
+        if (!(world instanceof ServerWorld serverWorld)) return;
 
-                if(responsible != null) {
-                    if(!RegionPermissionChecker.isAllowed(responsible, Rule.USE_FIRE_STARTERS, pos, serverWorld)) {
-                        this.sendDenyNotificationIfPossible(serverWorld, context.getSourcePos());
-                        ci.cancel();
-                    }
-                }
+        FireSpreadContext context = FireSpreadContext.getCurrent();
+        if (context == null || !context.getTargetPos().equals(pos)) return;
 
-                fireTracker.remove(pos);
+        FireOriginTracker fireTracker = WorldRegistry.get(serverWorld)
+                .getTrackerManager()
+                .getFireOriginTracker();
+        UUID responsible = fireTracker.getResponsible(context.getSourcePos());
+
+        if (responsible != null) {
+            if (!RegionPermissionChecker.isAllowed(responsible, Rule.USE_FIRE_STARTERS, pos, serverWorld)) {
+                this.sendDenyNotificationIfPossible(serverWorld, context.getSourcePos());
+                ci.cancel();
+                return;
             }
+
+            BlockFallOriginTracker blockFallTracker = WorldRegistry.get(serverWorld)
+                    .getTrackerManager()
+                    .getBlockFallOriginTracker();
+            blockFallTracker.record(pos, responsible);
+            BlockFallContext.push(responsible, pos);
         }
+
+        fireTracker.remove(pos);
+    }
+
+    @Inject(
+            method = "trySpreadingFire",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/world/World;removeBlock(Lnet/minecraft/util/math/BlockPos;Z)Z",
+                    shift = At.Shift.AFTER
+            )
+    )
+    private void popFallAfterFireRemove(World world, BlockPos pos, int spreadFactor,
+                                        Random random, int currentAge, CallbackInfo ci) {
+        BlockFallContext.pop();
     }
 
     @Inject(
@@ -177,12 +222,18 @@ public abstract class FireSpreadProtectionMixin {
         FireOriginTracker fireTracker = WorldRegistry.get(serverWorld)
                 .getTrackerManager()
                 .getFireOriginTracker();
-        UUID responsible = fireTracker.getResponsible(serverWorld, context.getSourcePos());
+        UUID responsible = fireTracker.getResponsible(context.getSourcePos());
         ServerPlayerEntity serverPlayer = serverWorld.getServer()
                 .getPlayerManager()
                 .getPlayer(responsible);
 
         if (responsible != null) {
+            BlockFallOriginTracker blockFallTracker = WorldRegistry.get(serverWorld)
+                    .getTrackerManager()
+                    .getBlockFallOriginTracker();
+            blockFallTracker.record(pos, responsible);
+            BlockFallContext.push(responsible, pos);
+
             TntEntity tntEntity = new TntEntity(
                     world,
                     (double)pos.getX() + 0.5,
@@ -191,6 +242,8 @@ public abstract class FireSpreadProtectionMixin {
                     serverPlayer
             );
             world.spawnEntity(tntEntity);
+
+            BlockFallContext.pop();
 
             world.playSound(
                     null,
@@ -215,13 +268,18 @@ public abstract class FireSpreadProtectionMixin {
         FireOriginTracker fireTracker = WorldRegistry.get(serverWorld)
                 .getTrackerManager()
                 .getFireOriginTracker();
-        UUID responsible = fireTracker.getResponsible(serverWorld, pos);
+        UUID responsible = fireTracker.getResponsible(pos);
 
         if(responsible != null) {
             boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.USE_FIRE_STARTERS, newPos, serverWorld);
 
             if(allowed) {
                 fireTracker.propagate(pos, newPos);
+                BlockFallOriginTracker blockFallTracker = WorldRegistry.get(serverWorld)
+                        .getTrackerManager()
+                        .getBlockFallOriginTracker();
+                blockFallTracker.record(newPos, responsible);
+                BlockFallContext.push(responsible, newPos);
             } else {
                 this.sendDenyNotificationIfPossible(serverWorld, pos);
                 ci.cancel();
@@ -247,7 +305,7 @@ public abstract class FireSpreadProtectionMixin {
         FireOriginTracker fireTracker = WorldRegistry.get(serverWorld)
                 .getTrackerManager()
                 .getFireOriginTracker();
-        UUID responsible = fireTracker.getResponsible(serverWorld, pos);
+        UUID responsible = fireTracker.getResponsible(pos);
         ServerPlayerEntity serverPlayer = serverWorld.getServer()
                 .getPlayerManager()
                 .getPlayer(responsible);

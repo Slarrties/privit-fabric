@@ -1,6 +1,5 @@
 package dev.slarrties.privit.server.tracking.protection;
 
-import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.server.tracking.nbt.TrackerNbtPersistence;
 import dev.slarrties.privit.server.tracking.origin.OriginTracker;
 import dev.slarrties.privit.server.tracking.origin.EntityOriginTracker;
@@ -41,6 +40,7 @@ public final class TrackerManager {
     private final IceOriginTracker iceOriginTracker;
     private final HeatSourceOriginTracker heatSourceOriginTracker;
     private final CampfireOriginTracker campfireOriginTracker;
+    private final BlockFallOriginTracker blockFallOriginTracker;
 
     public TrackerManager(ServerWorld world) {
         this.world = world;
@@ -60,6 +60,7 @@ public final class TrackerManager {
         this.iceOriginTracker = new IceOriginTracker(world);
         this.heatSourceOriginTracker = new HeatSourceOriginTracker(world);
         this.campfireOriginTracker = new CampfireOriginTracker(world);
+        this.blockFallOriginTracker = new BlockFallOriginTracker(world);
 
         registerAll();
 
@@ -88,18 +89,18 @@ public final class TrackerManager {
         allTrackers.add(iceOriginTracker);
         allTrackers.add(heatSourceOriginTracker);
         allTrackers.add(campfireOriginTracker);
+        allTrackers.add(blockFallOriginTracker);
     }
 
     public void onServerTick() {
-        if (++tickCounter % CLEANUP_INTERVAL_TICKS != 0) {
-            return;
-        }
+        if (++tickCounter % CLEANUP_INTERVAL_TICKS != 0) return;
+
         tickCounter = 0;
 
 //        PrivitMod.LOGGER.info("[TrackerManager] Running periodic cleanup for dimension {}", world.getRegistryKey().getValue());
 
         for (OriginTracker tracker : allTrackers) {
-            tracker.onServerTick(world);
+            tracker.onServerTick();
         }
     }
 
@@ -154,6 +155,7 @@ public final class TrackerManager {
     public IceOriginTracker getIceOriginTracker() { return iceOriginTracker; }
     public HeatSourceOriginTracker getHeatSourceOriginTracker() { return heatSourceOriginTracker; }
     public CampfireOriginTracker getCampfireOriginTracker() { return campfireOriginTracker; }
+    public BlockFallOriginTracker getBlockFallOriginTracker() { return blockFallOriginTracker; }
 
     public NbtCompound saveToNbt() {
         NbtCompound root = new NbtCompound();

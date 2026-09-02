@@ -3,9 +3,12 @@ package dev.slarrties.privit.server.region.protection.mixin.build;
 import dev.slarrties.privit.common.region.Color;
 import dev.slarrties.privit.common.region.rule.Rule;
 import dev.slarrties.privit.common.notification.NotificationType;
+import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
+import dev.slarrties.privit.server.tracking.context.BlockFallContext;
+import dev.slarrties.privit.server.tracking.protection.BlockFallOriginTracker;
 
 import net.minecraft.world.World;
 import net.minecraft.item.BlockItem;
@@ -26,7 +29,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@AssociatedRule(Rule.BUILD)
+@AssociatedRule({Rule.BUILD, Rule.CAUSE_BLOCK_FALL})
 @Mixin(ServerPlayerInteractionManager.class)
 public abstract class BuildPlaceMixin {
 
@@ -40,11 +43,24 @@ public abstract class BuildPlaceMixin {
         BlockPos placePos = hitResult.getBlockPos().offset(hitResult.getSide());
 
         if (!RegionPermissionChecker.isAllowed(player.getUuid(), Rule.BUILD, placePos, player.getServerWorld())) {
-            cir.setReturnValue(ActionResult.FAIL);
             player.networkHandler.sendPacket(new BlockUpdateS2CPacket(placePos, player.getWorld().getBlockState(placePos)));
             player.networkHandler.sendPacket(new ScreenHandlerSlotUpdateS2CPacket(-2, 0,
                     hand == Hand.MAIN_HAND ? player.getInventory().selectedSlot : 40, player.getStackInHand(hand)));
             PlayerNotification.trySend(player, NotificationType.DENY_PLACE_BLOCK, Color.RED);
+            cir.setReturnValue(ActionResult.FAIL);
+            return;
         }
+
+        BlockFallOriginTracker blockFallTracker = WorldRegistry.get(player.getServerWorld())
+                .getTrackerManager()
+                .getBlockFallOriginTracker();
+        blockFallTracker.record(placePos, player.getUuid());
+        BlockFallContext.push(player.getUuid(), placePos);
+    }
+
+    @Inject(method = "interactBlock", at = @At("RETURN"))
+    private void popBlockFallContext(ServerPlayerEntity player, World world, ItemStack stack,
+                                     Hand hand, BlockHitResult hitResult, CallbackInfoReturnable<ActionResult> cir) {
+        BlockFallContext.pop();
     }
 }

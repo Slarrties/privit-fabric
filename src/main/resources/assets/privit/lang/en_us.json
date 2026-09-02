@@ -82,6 +82,7 @@
   "privit.rule.create_nether_portals.name": "Nether portals",
   "privit.rule.push_entities.name": "Push entities",
   "privit.rule.spread_sculk.name": "Sculk",
+  "privit.rule.cause_block_fall.name": "Falling blocks",
 
   "privit.rule.manage.description": "Manage region\nIf this rule is §n§aon§r, members of this\ngroup can:\n- change the region boundaries\n- change the name and color of the region\n- create / edit / delete groups and rules\n- add / remove players from groups\n§8(Cannot be turned off, or you will lose edit permission)",
   "privit.rule.pvp.description": "PvP\nIf this rule is §n§coff§r, members of this\ngroup cannot:\n- deal damage to other players\n- take damage from other players",
@@ -120,6 +121,7 @@
   "privit.rule.create_nether_portals.description": "Use nether portals\nIf this rule is §n§coff§r, members of this\ngroup cannot use nether portals\nin this region:\n- cannot teleport to another dimension\n  from inside the region\n- a new portal will not be generated\n  inside the region when arriving from\n  another dimension",
   "privit.rule.push_entities.description": "Push entities\nIf this rule is §n§coff§r, members of this\ngroup cannot push entities inside\nthe region.\n§8(Minecarts and boats are not\n§8affected by this rule)",
   "privit.rule.spread_sculk.description": "Sculk spread\nIf this rule is §n§coff§r, sculk whose\nspread was started by members of this\ngroup will not spread into the region.",
+  "privit.rule.cause_block_fall.description": "Falling blocks\nIf this rule is §n§coff§r, gravity-affected blocks\n(sand, gravel, anvils, dripstone, etc.) that\nmembers of this group push into the region\nfrom outside §n§cwill be destroyed with no drops.§r\nBlocks already inside the region §n§aare not destroyed§r, \neven if members of this group\nset them in motion.",
 
   "privit.notification.region_created": "Region successfully created",
   "privit.notification.region_creation_failed": "Error creating region",
@@ -173,6 +175,7 @@
   "privit.notification.deny_use_piston": "You cannot move blocks with pistons in this region",
   "privit.notification.deny_use_trial_mechanics": "You cannot use trial mechanics in this region",
   "privit.notification.deny_spread_sculk": "You cannot spread sculk in this region",
+  "privit.notification.deny_block_fall": "You cannot drop falling blocks into this region",
 
   "privit.command.help.header": "===== Privit commands =====",
   "privit.command.help.help": "/privit help — list available commands",

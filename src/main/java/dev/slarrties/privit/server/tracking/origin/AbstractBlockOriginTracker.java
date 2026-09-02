@@ -5,6 +5,7 @@ import dev.slarrties.privit.PrivitMod;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.server.world.ServerWorld;
+
 import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
@@ -29,7 +30,9 @@ public abstract class AbstractBlockOriginTracker implements BlockOriginTracker {
     @Override
     public void propagate(BlockPos from, BlockPos to) {
         if (from == null || to == null || world.isClient) return;
+
         UUID uuid = responsible.get(from.asLong());
+
         if (uuid != null) {
             responsible.put(to.asLong(), uuid);
         }
@@ -37,9 +40,7 @@ public abstract class AbstractBlockOriginTracker implements BlockOriginTracker {
 
     @Override
     @Nullable
-    public UUID getResponsible(ServerWorld world, BlockPos pos) {
-        if (pos == null || world.isClient) return null;
-
+    public UUID getResponsible(BlockPos pos) {
         return responsible.get(pos.asLong());
     }
 
@@ -59,9 +60,7 @@ public abstract class AbstractBlockOriginTracker implements BlockOriginTracker {
     }
 
     @Override
-    public void onServerTick(ServerWorld world) {
-        // TODO: perform cleanup by reconciling the pos and the block that exists on it
-    }
+    public void onServerTick() {} // TODO: perform cleanup by reconciling the pos and the block that exists on it
 
     @Override
     public boolean isPersistent() {

@@ -21,9 +21,10 @@ public final class RedstoneOriginTracker extends AbstractBlockOriginTracker {
 
     @Nullable
     public UUID getResponsible(BlockPos pos) {
-        return super.getResponsible(world, pos);
+        return super.getResponsible(pos);
     }
 
+    @Override
     public void remove(BlockPos pos) {
         super.remove(pos);
     }

@@ -54,7 +54,7 @@ public final class UseFireStarterHandler implements RuleEventHandler {
             }
 
             if(world instanceof ServerWorld serverWorld) {
-                FireOriginTracker fireTracker =  WorldRegistry.get(serverWorld)
+                FireOriginTracker fireTracker = WorldRegistry.get(serverWorld)
                         .getTrackerManager()
                         .getFireOriginTracker();
                 fireTracker.record(checkPos, serverPlayer.getUuid());

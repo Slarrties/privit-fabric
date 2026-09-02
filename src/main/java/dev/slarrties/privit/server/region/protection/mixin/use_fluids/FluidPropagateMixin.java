@@ -42,7 +42,7 @@ public abstract class FluidPropagateMixin {
                 .getTrackerManager()
                 .getFluidOriginTracker();
 
-        UUID ownerUuid = fluidOriginTracker.getOwner(fromPos);
+        UUID ownerUuid = fluidOriginTracker.getResponsible(fromPos);
         if (ownerUuid == null) ownerUuid = findOwnerFromNeighbors(fromPos, serverWorld);
         if (ownerUuid == null) return;
 
@@ -70,7 +70,7 @@ public abstract class FluidPropagateMixin {
             return;
         }
 
-        UUID ownerUuid = fluidOriginTracker.getOwner(pos);
+        UUID ownerUuid = fluidOriginTracker.getResponsible(pos);
         if (ownerUuid == null) ownerUuid = findOwnerFromNeighbors(pos, serverWorld);
         if (ownerUuid == null) return;
 
@@ -89,7 +89,7 @@ public abstract class FluidPropagateMixin {
                 .getFluidOriginTracker();
 
         for (Direction dir : Direction.values()) {
-            UUID owner = fluidOriginTracker.getOwner(pos.offset(dir));
+            UUID owner = fluidOriginTracker.getResponsible(pos.offset(dir));
             if (owner != null) return owner;
         }
         return null;

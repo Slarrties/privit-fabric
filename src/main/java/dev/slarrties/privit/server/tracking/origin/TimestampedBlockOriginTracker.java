@@ -1,10 +1,9 @@
 package dev.slarrties.privit.server.tracking.origin;
 
-import dev.slarrties.privit.PrivitMod;
-
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.server.world.ServerWorld;
+
 import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
@@ -12,38 +11,31 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class TimestampedBlockOriginTracker extends AbstractBlockOriginTracker {
 
-    public record OwnershipRecord(UUID owner, long timestamp) {}
+    public record ResponsibleTimestamp(UUID owner, long timestamp) {}
 
-    protected final ConcurrentHashMap<Long, OwnershipRecord> records = new ConcurrentHashMap<>();
+    protected final ConcurrentHashMap<Long, ResponsibleTimestamp> records = new ConcurrentHashMap<>();
 
     protected TimestampedBlockOriginTracker(ServerWorld world) {
         super(world);
     }
 
+    @Override
     public void record(BlockPos pos, UUID playerUuid) {
         if (pos == null || playerUuid == null || world.isClient) return;
 
-        long time = world.getTime();
-        records.put(pos.asLong(), new OwnershipRecord(playerUuid, time));
-
+        records.put(pos.asLong(), new ResponsibleTimestamp(playerUuid, world.getTime()));
         super.record(pos, playerUuid);
     }
 
-    @Nullable
-    public OwnershipRecord getRecord(BlockPos pos) {
-        if (pos == null || world.isClient) return null;
-        return records.get(pos.asLong());
-    }
+    @Override
+    public void propagate(BlockPos from, BlockPos to) {
+        if (from == null || to == null || world.isClient) return;
 
-    @Nullable
-    public UUID getOwner(BlockPos pos) {
-        OwnershipRecord record = getRecord(pos);
-        return record != null ? record.owner() : null;
-    }
+        ResponsibleTimestamp record = records.get(from.asLong());
+        if (record == null) return;
 
-    public long getTimestamp(BlockPos pos) {
-        OwnershipRecord record = getRecord(pos);
-        return record != null ? record.timestamp() : 0L;
+        records.put(to.asLong(), record);
+        super.record(to, record.owner());
     }
 
     @Override
@@ -59,9 +51,10 @@ public abstract class TimestampedBlockOriginTracker extends AbstractBlockOriginT
         super.clearAll();
     }
 
-    @Override
-    public void onWorldUnload() {
-        clearAll();
+    @Nullable
+    public TimestampedBlockOriginTracker.ResponsibleTimestamp getResponsibleTimestamp(BlockPos pos) {
+        if (pos == null || world.isClient) return null;
+        return records.get(pos.asLong());
     }
 
     @Override
@@ -80,7 +73,6 @@ public abstract class TimestampedBlockOriginTracker extends AbstractBlockOriginT
     public void fromNbt(NbtCompound tag) {
         records.clear();
         super.clearAll();
-
         if (tag == null) return;
 
         for (String key : tag.getKeys()) {
@@ -91,12 +83,9 @@ public abstract class TimestampedBlockOriginTracker extends AbstractBlockOriginT
 
                 UUID owner = recordTag.getUuid("owner");
                 long time = recordTag.contains("time") ? recordTag.getLong("time") : 0L;
-
-                records.put(posLong, new OwnershipRecord(owner, time));
+                records.put(posLong, new ResponsibleTimestamp(owner, time));
                 this.responsible.put(posLong, owner);
-            } catch (Exception e) {
-                PrivitMod.LOGGER.warn("[{}] Skipping corrupted entry: {}", getClass().getSimpleName(), key);
-            }
+            } catch (Exception ignored) {}
         }
     }
 }

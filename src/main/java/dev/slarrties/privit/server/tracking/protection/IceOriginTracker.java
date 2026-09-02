@@ -20,14 +20,8 @@ public final class IceOriginTracker extends TimestampedBlockOriginTracker {
     }
 
     @Nullable
-    @Override
-    public UUID getOwner(BlockPos pos) {
-        return super.getOwner(pos);
-    }
-
-    @Nullable
-    public OwnershipRecord getRecord(BlockPos pos) {
-        return super.getRecord(pos);
+    public TimestampedBlockOriginTracker.ResponsibleTimestamp getResponsibleTimestamp(BlockPos pos) {
+        return super.getResponsibleTimestamp(pos);
     }
 
     @Override

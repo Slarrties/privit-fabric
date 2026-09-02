@@ -10,7 +10,9 @@ import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
+import dev.slarrties.privit.server.tracking.context.BlockFallContext;
 import dev.slarrties.privit.server.tracking.protection.ExplosionOriginTracker;
+import dev.slarrties.privit.server.tracking.protection.BlockFallOriginTracker;
 
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.Ownable;
@@ -21,6 +23,7 @@ import net.minecraft.entity.projectile.AbstractWindChargeEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.explosion.Explosion;
 
@@ -34,7 +37,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.UUID;
 
-@AssociatedRule({Rule.CAUSE_EXPLOSIONS, Rule.THROW_WIND_CHARGES})
+@AssociatedRule({
+        Rule.CAUSE_EXPLOSIONS,
+        Rule.THROW_WIND_CHARGES,
+        Rule.CAUSE_BLOCK_FALL
+})
 @Mixin(Explosion.class)
 public abstract class ExplosionProtectionMixin {
 
@@ -108,6 +115,28 @@ public abstract class ExplosionProtectionMixin {
         getExplosion().getAffectedBlocks().removeIf(pos ->
                 !RegionPermissionChecker.isAllowed(responsible, rule, pos, serverWorld)
         );
+    }
+
+    @Inject(method = "affectWorld", at = @At("HEAD"))
+    private void markFallFromExplosion(boolean particles, CallbackInfo ci) {
+        if (!(this.world instanceof ServerWorld serverWorld)) return;
+
+        UUID responsible = getResponsiblePlayer(serverWorld);
+        if (responsible == null) return;
+
+        BlockFallContext.push(responsible, BlockPos.ofFloored(getExplosion().getPosition()));
+
+        for (BlockPos pos : getExplosion().getAffectedBlocks()) {
+            BlockFallOriginTracker blockFallTracker = WorldRegistry.get(serverWorld)
+                    .getTrackerManager()
+                    .getBlockFallOriginTracker();
+            blockFallTracker.record(pos, responsible);
+        }
+    }
+
+    @Inject(method = "affectWorld", at = @At("RETURN"))
+    private void popFallFromExplosion(boolean particles, CallbackInfo ci) {
+        BlockFallContext.pop();
     }
 
     @Unique

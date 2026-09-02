@@ -8,6 +8,7 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.protection.ExplosionOriginTracker;
+import dev.slarrties.privit.server.tracking.protection.BlockFallOriginTracker;
 import dev.slarrties.privit.server.tracking.redstone.handler.RedstoneReceiverHandler;
 
 import net.minecraft.block.TntBlock;
@@ -15,8 +16,8 @@ import net.minecraft.block.BlockState;
 import net.minecraft.entity.TntEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.world.World;
 import net.minecraft.world.explosion.Explosion;
 import net.minecraft.server.world.ServerWorld;
@@ -32,7 +33,7 @@ import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
 import java.util.UUID;
 
-@AssociatedRule(Rule.CAUSE_EXPLOSIONS)
+@AssociatedRule({Rule.CAUSE_EXPLOSIONS, Rule.CAUSE_BLOCK_FALL})
 @Mixin(TntBlock.class)
 public abstract class TntBlockExplosionMixin {
 
@@ -58,6 +59,7 @@ public abstract class TntBlockExplosionMixin {
 
             if (responsible != null) {
                 explosionOriginTracker.record(tntEntity, responsible);
+                markFallFromTnt(serverWorld, pos, responsible);
             }
         }
     }
@@ -71,18 +73,24 @@ public abstract class TntBlockExplosionMixin {
             locals = LocalCapture.CAPTURE_FAILSOFT
     )
     private static void propagateResponsiblePlayerOnRedstoneActivation(World world, BlockPos pos,
-            @Nullable LivingEntity igniter, CallbackInfo ci, TntEntity tntEntity) {
-        if (world.isClient || tntEntity == null || igniter != null) return;
-        if (world instanceof ServerWorld serverWorld) {
-            UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverWorld, pos);
+                                                                       @Nullable LivingEntity igniter, CallbackInfo ci, TntEntity tntEntity) {
+        if (world.isClient || tntEntity == null) return;
+        if (!(world instanceof ServerWorld serverWorld)) return;
 
-            if (responsible != null) {
-                WorldRegistry.get(serverWorld)
-                        .getTrackerManager()
-                        .getExplosionOriginTracker()
-                        .record(tntEntity, responsible);
-            }
+        UUID responsible = null;
+
+        if (igniter instanceof ServerPlayerEntity player) {
+            responsible = player.getUuid();
+        } else {
+            responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverWorld, pos);
         }
+        if (responsible == null) return;
+
+        WorldRegistry.get(serverWorld)
+                .getTrackerManager()
+                .getExplosionOriginTracker()
+                .record(tntEntity, responsible);
+        markFallFromTnt(serverWorld, pos, responsible);
     }
 
     @Inject(
@@ -119,5 +127,15 @@ public abstract class TntBlockExplosionMixin {
         }
 
         return null;
+    }
+
+    @Unique
+    private static void markFallFromTnt(ServerWorld serverWorld, BlockPos pos, UUID responsible) {
+        if (responsible == null) return;
+
+        BlockFallOriginTracker blockFallTracker = WorldRegistry.get(serverWorld)
+                .getTrackerManager()
+                .getBlockFallOriginTracker();
+        blockFallTracker.record(pos, responsible);
     }
 }

@@ -56,7 +56,7 @@ public abstract class LavaFluidMixin {
             FluidOriginTracker fluidOriginTracker = WorldRegistry.get(serverWorld)
                     .getTrackerManager()
                     .getFluidOriginTracker();
-            UUID owner = fluidOriginTracker.getOwner(lavaPos);
+            UUID owner = fluidOriginTracker.getResponsible(lavaPos);
 
             if (owner != null) {
                 if (!RegionPermissionChecker.isAllowed(owner, Rule.USE_FIRE_STARTERS, firePos, serverWorld)) {

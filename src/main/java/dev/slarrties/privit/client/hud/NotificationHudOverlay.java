@@ -34,6 +34,7 @@ public class NotificationHudOverlay implements HudRenderCallback {
             case REGION_TOO_BIG -> "privit.notification.region_too_big";
             case REGION_ID_CONFLICT -> "privit.notification.region_id_conflict";
             case REGION_NOT_ACCEPTED -> "privit.notification.region_not_accepted";
+            case REGIONS_LIMIT_REACHED -> "privit.notification.regions_limit_reached";
 
             case DENY_MANAGE -> "privit.notification.deny_manage";
             case DENY_BREAK_BLOCK  -> "privit.notification.deny_break_block";
@@ -77,7 +78,7 @@ public class NotificationHudOverlay implements HudRenderCallback {
             case DENY_USE_PISTON -> "privit.notification.deny_use_piston";
             case DENY_USE_TRIAL_MECHANICS -> "privit.notification.deny_use_trial_mechanics";
             case DENY_SPREAD_SCULK -> "privit.notification.deny_spread_sculk";
-            case REGIONS_LIMIT_REACHED -> "privit.notification.regions_limit_reached";
+            case DENY_BLOCK_FALL -> "privit.notification.deny_block_fall";
         };
 
         currentMessage = Text.translatable(translationKey).getString();

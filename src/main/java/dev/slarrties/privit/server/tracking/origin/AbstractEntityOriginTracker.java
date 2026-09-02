@@ -65,9 +65,9 @@ public abstract class AbstractEntityOriginTracker implements EntityOriginTracker
     }
 
     @Override
-    public void onServerTick(ServerWorld world) {
+    public void onServerTick() {
         responsible.entrySet().removeIf(entry -> {
-            Entity entity = world.getEntity(entry.getKey());
+            Entity entity = this.world.getEntity(entry.getKey());
             return entity == null || entity.isRemoved();
         });
     }

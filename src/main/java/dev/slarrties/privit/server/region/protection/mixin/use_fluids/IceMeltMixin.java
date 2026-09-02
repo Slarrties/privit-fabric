@@ -39,12 +39,12 @@ public abstract class IceMeltMixin {
         IceOriginTracker iceTracker = trackerManager.getIceOriginTracker();
         FluidOriginTracker fluidTracker = trackerManager.getFluidOriginTracker();
 
-        TimestampedBlockOriginTracker.OwnershipRecord iceRecord = iceTracker.getRecord(pos);
-        TimestampedBlockOriginTracker.OwnershipRecord heatRecord = findNearestHeatSourceRecord(pos, serverWorld, 3);
+        TimestampedBlockOriginTracker.ResponsibleTimestamp iceRecord = iceTracker.getResponsibleTimestamp(pos);
+        TimestampedBlockOriginTracker.ResponsibleTimestamp heatRecord = findNearestHeatSourceRecord(pos, serverWorld, 3);
 
         iceTracker.remove(pos);
 
-        TimestampedBlockOriginTracker.OwnershipRecord culprit = chooseCulprit(iceRecord, heatRecord);
+        TimestampedBlockOriginTracker.ResponsibleTimestamp culprit = chooseCulprit(iceRecord, heatRecord);
 
         if (culprit == null) return;
         if (serverWorld.getDimension().ultrawarm()) return;
@@ -70,8 +70,8 @@ public abstract class IceMeltMixin {
 
     @Unique
     @Nullable
-    private TimestampedBlockOriginTracker.OwnershipRecord chooseCulprit(
-            @Nullable TimestampedBlockOriginTracker.OwnershipRecord ice, @Nullable TimestampedBlockOriginTracker.OwnershipRecord heat) {
+    private TimestampedBlockOriginTracker.ResponsibleTimestamp chooseCulprit(
+            @Nullable TimestampedBlockOriginTracker.ResponsibleTimestamp ice, @Nullable TimestampedBlockOriginTracker.ResponsibleTimestamp heat) {
         if (ice == null && heat == null) return null;
         if (ice == null) return heat;
         if (heat == null) return ice;
@@ -81,14 +81,14 @@ public abstract class IceMeltMixin {
 
     @Unique
     @Nullable
-    private TimestampedBlockOriginTracker.OwnershipRecord findNearestHeatSourceRecord(BlockPos icePos, ServerWorld world, int radius) {
+    private TimestampedBlockOriginTracker.ResponsibleTimestamp findNearestHeatSourceRecord(BlockPos icePos, ServerWorld world, int radius) {
         var trackerManager = WorldRegistry.get(world).getTrackerManager();
         HeatSourceOriginTracker heatTracker = trackerManager.getHeatSourceOriginTracker();
         FluidOriginTracker fluidTracker = trackerManager.getFluidOriginTracker();
         FireOriginTracker fireTracker = trackerManager.getFireOriginTracker();
         CampfireOriginTracker campfireTracker = trackerManager.getCampfireOriginTracker();
 
-        TimestampedBlockOriginTracker.OwnershipRecord nearest = null;
+        TimestampedBlockOriginTracker.ResponsibleTimestamp nearest = null;
         int nearestDistance = Integer.MAX_VALUE;
         long now = world.getTime();
 
@@ -100,12 +100,12 @@ public abstract class IceMeltMixin {
 
                     BlockPos checkPos = icePos.add(dx, dy, dz);
                     BlockState state = world.getBlockState(checkPos);
-                    TimestampedBlockOriginTracker.OwnershipRecord candidate = null;
+                    TimestampedBlockOriginTracker.ResponsibleTimestamp candidate = null;
 
-                    candidate = heatTracker.getRecord(checkPos);
+                    candidate = heatTracker.getResponsibleTimestamp(checkPos);
 
                     if (candidate == null && world.getFluidState(checkPos).isOf(Fluids.LAVA)) {
-                        TimestampedBlockOriginTracker.OwnershipRecord lavaRecord = fluidTracker.getRecord(checkPos);
+                        TimestampedBlockOriginTracker.ResponsibleTimestamp lavaRecord = fluidTracker.getResponsibleTimestamp(checkPos);
 
                         if (lavaRecord != null) {
                             candidate = lavaRecord;
@@ -113,7 +113,7 @@ public abstract class IceMeltMixin {
                     }
 
                     if (candidate == null && (state.isOf(Blocks.FIRE) || state.isOf(Blocks.SOUL_FIRE))) {
-                        TimestampedBlockOriginTracker.OwnershipRecord fireRecord = fireTracker.getRecord(checkPos);
+                        TimestampedBlockOriginTracker.ResponsibleTimestamp fireRecord = fireTracker.getResponsibleTimestamp(checkPos);
                         if (fireRecord != null) {
                             candidate = fireRecord;
                         }
@@ -123,13 +123,13 @@ public abstract class IceMeltMixin {
                             && (state.isOf(Blocks.CAMPFIRE) || state.isOf(Blocks.SOUL_CAMPFIRE))
                             && state.contains(Properties.LIT)
                             && state.get(Properties.LIT)) {
-                        candidate = campfireTracker.getRecord(checkPos);
+                        candidate = campfireTracker.getResponsibleTimestamp(checkPos);
                     }
 
                     if (candidate == null && isLitLamp(state)) {
                         UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(world, checkPos);
                         if (responsible != null) {
-                            candidate = new TimestampedBlockOriginTracker.OwnershipRecord(responsible, now);
+                            candidate = new TimestampedBlockOriginTracker.ResponsibleTimestamp(responsible, now);
                         }
                     }
 

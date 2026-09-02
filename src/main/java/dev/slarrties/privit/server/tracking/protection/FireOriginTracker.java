@@ -23,28 +23,28 @@ public final class FireOriginTracker extends TimestampedBlockOriginTracker {
     public void propagate(BlockPos from, BlockPos to) {
         if (from == null || to == null || world.isClient || from.equals(to)) return;
 
-        OwnershipRecord fromRecord = records.get(from.asLong());
+        ResponsibleTimestamp fromRecord = records.get(from.asLong());
         if (fromRecord != null) {
             records.put(to.asLong(), fromRecord);
             this.responsible.put(to.asLong(), fromRecord.owner());
         }
     }
 
-    @Nullable
-    public UUID getOwner(BlockPos pos) {
-        return super.getOwner(pos);
-    }
+//    @Nullable
+//    public UUID getOwner(BlockPos pos) {
+//        return super.getOwner(pos);
+//    }
 
     @Nullable
-    public OwnershipRecord getRecord(BlockPos pos) {
-        return super.getRecord(pos);
+    public TimestampedBlockOriginTracker.ResponsibleTimestamp getResponsibleTimestamp(BlockPos pos) {
+        return super.getResponsibleTimestamp(pos);
     }
 
-    @Nullable
-    @Override
-    public UUID getResponsible(ServerWorld world, BlockPos pos) {
-        return super.getResponsible(world, pos);
-    }
+//    @Nullable
+//    @Override
+//    public UUID getResponsible(ServerWorld world, BlockPos pos) {
+//        return super.getResponsible(world, pos);
+//    }
 
     @Override
     public void remove(BlockPos pos) {

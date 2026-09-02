@@ -1,0 +1,9 @@
+## 1.1.0 — 02-09-2026
+
+### Added
+- new rule CAUSE_BLOCK_FALL has been added — it affects block categories subject to gravity (sand, gravel, anvils, dragon eggs, dripstone, etc.). If an attacker attempts to drop them onto a prohibited region, they will be destroyed without dropping any items.
+
+### Bugfix
+- Fixed the bug, that allowed players to install scaffolding in the region territory, who have the BUILD rule disabled.
+
+- Other technical improvements related to the tracking system.
