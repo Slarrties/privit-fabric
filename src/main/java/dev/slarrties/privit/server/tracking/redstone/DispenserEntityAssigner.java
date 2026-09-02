@@ -29,50 +29,51 @@ public final class DispenserEntityAssigner {
 
     public static void assignOwner(ServerWorld serverWorld, BlockPos dispenserPos, @Nullable EntityType<?> entityType, ItemStack stack) {
         UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverWorld, dispenserPos);
+
         if (responsible == null) return;
-        if (entityType == null) entityType = getEntityTypeFromStack(stack);
-
-        ServerPlayerEntity serverPlayer = serverWorld.getServer()
-                .getPlayerManager()
-                .getPlayer(responsible);
-        if (serverPlayer == null) {
-            PrivitMod.LOGGER.error("[DispenserEntityAssigner] Couldn't find player {}", responsible);
-            return;
-        }
-
+        if (entityType == null)
+            entityType = getEntityTypeFromStack(stack);
         if (entityType == EntityType.TNT) {
-            assignToTnt(serverWorld, dispenserPos, serverPlayer);
+            assignToTnt(serverWorld, dispenserPos, responsible);
         } else if (isProjectile(entityType)) {
-            assignToProjectile(serverWorld, dispenserPos, serverPlayer);
+            assignToProjectile(serverWorld, dispenserPos, responsible);
         } else if (entityType == EntityType.TNT_MINECART || stack.getItem() instanceof MinecartItem) {
-            assignToMinecart(serverWorld, dispenserPos, serverPlayer);
+            assignToMinecart(serverWorld, dispenserPos, responsible);
         } else if (stack.getItem() instanceof BoatItem) {
-            assignToBoat(serverWorld, dispenserPos, serverPlayer);
+            assignToBoat(serverWorld, dispenserPos, responsible);
         } else if (stack.getItem() instanceof SpawnEggItem) {
-            assignToInfluencedEntity(serverWorld, dispenserPos, serverPlayer);
+            assignToInfluencedEntity(serverWorld, dispenserPos, responsible);
         } else if (stack.getItem() instanceof BucketItem) {
-            assignToInfluencedEntity(serverWorld, dispenserPos, serverPlayer);
+            assignToInfluencedEntity(serverWorld, dispenserPos, responsible);
         }
     }
 
     // TODO: can record a player without the culprit if they are within range
-    private static void assignToInfluencedEntity(ServerWorld world, BlockPos pos, ServerPlayerEntity responsible) {
+    private static void assignToInfluencedEntity(ServerWorld world, BlockPos pos, UUID responsible) {
         InfluencedEntityTracker influencedEntityTracker = WorldRegistry.get(world)
                 .getTrackerManager()
                 .getInfluencedEntityTracker();
         Box box = new Box(pos).expand(1.0);
 
         world.getEntitiesByClass(LivingEntity.class, box, e -> influencedEntityTracker.getResponsible(e) == null)
-                .forEach(e -> influencedEntityTracker.record(e, responsible.getUuid()));
+                .forEach(e -> influencedEntityTracker.record(e, responsible));
     }
 
-    private static void assignToProjectile(ServerWorld world, BlockPos pos, ServerPlayerEntity responsible) {
+    private static void assignToProjectile(ServerWorld serverWorld, BlockPos pos, UUID responsible) {
         Box box = new Box(pos).expand(2.0);
-        world.getEntitiesByClass(ProjectileEntity.class, box, p -> p.getOwner() == null)
-                .forEach(projectile -> projectile.setOwner(responsible));
+        ServerPlayerEntity serverPlayer = serverWorld.getServer()
+                .getPlayerManager()
+                .getPlayer(responsible);
+
+        if(serverPlayer != null) {
+            serverWorld.getEntitiesByClass(ProjectileEntity.class, box, p -> p.getOwner() == null)
+                    .forEach(projectile -> projectile.setOwner(serverPlayer));
+        } else {
+            PrivitMod.LOGGER.warn("[DispenserEntityAssigner] Could not find player {} ", responsible);
+        }
     }
 
-    private static void assignToTnt(ServerWorld world, BlockPos pos, ServerPlayerEntity responsible) {
+    private static void assignToTnt(ServerWorld world, BlockPos pos, UUID responsible) {
         ExplosionOriginTracker explosionOriginTracker = WorldRegistry.get(world)
                 .getTrackerManager()
                 .getExplosionOriginTracker();
@@ -80,10 +81,10 @@ public final class DispenserEntityAssigner {
 
         world.getEntitiesByClass(TntEntity.class, box,
                         tnt -> explosionOriginTracker.getResponsiblePlayer(tnt) == null)
-                .forEach(tnt -> explosionOriginTracker.record(tnt, responsible.getUuid()));
+                .forEach(tnt -> explosionOriginTracker.record(tnt, responsible));
     }
 
-    private static void assignToMinecart(ServerWorld world, BlockPos pos, ServerPlayerEntity responsible) {
+    private static void assignToMinecart(ServerWorld world, BlockPos pos, UUID responsible) {
         MinecartOriginTracker minecartOriginTracker = WorldRegistry.get(world)
                 .getTrackerManager()
                 .getMinecartOriginTracker();
@@ -91,16 +92,16 @@ public final class DispenserEntityAssigner {
 
         world.getEntitiesByClass(AbstractMinecartEntity.class, box,
                         cart -> minecartOriginTracker.getResponsiblePlayer(cart) == null)
-                .forEach(cart -> minecartOriginTracker.record(cart, responsible.getUuid()));
+                .forEach(cart -> minecartOriginTracker.record(cart, responsible));
     }
 
-    private static void assignToBoat(ServerWorld world, BlockPos pos, ServerPlayerEntity responsible) {
+    private static void assignToBoat(ServerWorld world, BlockPos pos, UUID responsible) {
         BoatOriginTracker boatOriginTracker = WorldRegistry.get(world).getTrackerManager().getBoatOriginTracker();
         Box box = new Box(pos).expand(2.0);
 
         world.getEntitiesByClass(BoatEntity.class, box,
                         boat -> boatOriginTracker.getResponsiblePlayer(boat) == null)
-                .forEach(boat -> boatOriginTracker.record(boat, responsible.getUuid()));
+                .forEach(boat -> boatOriginTracker.record(boat, responsible));
     }
 
     @Nullable
@@ -124,6 +125,7 @@ public final class DispenserEntityAssigner {
                 type == EntityType.WIND_CHARGE ||
                 type == EntityType.ARROW ||
                 type == EntityType.SPECTRAL_ARROW ||
-                type == EntityType.SMALL_FIREBALL;
+                type == EntityType.SMALL_FIREBALL ||
+                type == EntityType.FIREBALL;
     }
 }

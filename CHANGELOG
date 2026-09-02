@@ -7,3 +7,12 @@
 - Fixed the bug, that allowed players to install scaffolding in the region territory, who have the BUILD rule disabled.
 
 - Other technical improvements related to the tracking system.
+
+
+
+## 1.1.1 — 02-09-2026
+
+### Bugfix
+- Fixed the bug, when a fire charge released using a dispenser could bypass the region’s rule restrictions.
+
+- Vulnerability has been fixed, in scenario, then player could activate a redstone machanism and leave the server, after which the actions performed by this redstone mechanism would bypass the existing regional restrictions.
