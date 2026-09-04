@@ -16,3 +16,10 @@
 - Fixed the bug, when a fire charge released using a dispenser could bypass the region’s rule restrictions.
 
 - Vulnerability has been fixed, in scenario, then player could activate a redstone machanism and leave the server, after which the actions performed by this redstone mechanism would bypass the existing regional restrictions.
+
+
+
+## 1.1.2 — 04-09-2026
+
+### Changed
+- Adjusted the color tones used for the region HUD and grid.
