@@ -17,11 +17,10 @@ public record RenderProperties(
 ) {
 
     public static RenderProperties fromColor(Color color, float fillAlpha, boolean isDashed) {
-        Integer val = color.getFormatting().getColorValue();
-        int rgb = val != null ? val : 0x88CCFF;
+        int rgb = color.getColorValue();
 
         float r = ((rgb >> 16) & 0xFF) / 255f;
-        float g = ((rgb >> 8) & 0xFF) / 255f;
+        float g = ((rgb >> 8)  & 0xFF) / 255f;
         float b = (rgb & 0xFF) / 255f;
 
         float edgeMultiplier = 1.55f;

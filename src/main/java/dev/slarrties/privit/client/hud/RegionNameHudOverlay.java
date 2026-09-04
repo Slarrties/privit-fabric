@@ -87,13 +87,13 @@ public final class RegionNameHudOverlay implements HudRenderCallback {
             nameAlpha = 0.0f;
         }
 
-        float cubeAlpha = appearAlpha;
+        int rgb = regionColor.getColorValue();
 
         Style coloredStyle = Style.EMPTY
                 .withFont(CUSTOM_FONT)
-                .withColor(regionColor.getFormatting());
+                .withColor(rgb);
 
-        Style nameStyle = Style.EMPTY.withColor(regionColor.getFormatting());
+        Style nameStyle = Style.EMPTY.withColor(rgb);
 
         MutableText nameText = Text.literal(regionName).setStyle(nameStyle);
         MutableText cubeText = Text.literal(CUBE_SYMBOL).setStyle(coloredStyle);
@@ -108,30 +108,28 @@ public final class RegionNameHudOverlay implements HudRenderCallback {
             context.drawTextWithShadow(client.textRenderer, nameText, coords.textX(), coords.y(), nameColor);
         }
 
-        if (cubeAlpha > 0.0f) {
-            int cubeColor = ((int) (cubeAlpha * 255F) << 24) | 0xFFFFFF;
+        if (appearAlpha > 0.0f) {
+            int cubeColor = ((int) (appearAlpha * 255F) << 24) | 0xFFFFFF;
             context.drawTextWithShadow(client.textRenderer, cubeText, coords.cubeX(), coords.y(), cubeColor);
         }
     }
 
     private void renderOutsideText(DrawContext context, float alpha, Color color) {
         MinecraftClient client = MinecraftClient.getInstance();
+        int rgb = color.getColorValue();
 
         MutableText outside = Text.translatable("privit.hud.outside_region")
-                .setStyle(Style.EMPTY.withColor(color.getFormatting()));
+                .setStyle(Style.EMPTY.withColor(rgb));
 
         MutableText cube = Text.literal(CUBE_SYMBOL)
-                .setStyle(Style.EMPTY.withFont(CUSTOM_FONT).withColor(color.getFormatting()));
+                .setStyle(Style.EMPTY.withFont(CUSTOM_FONT).withColor(rgb));
 
         int outsideWidth = client.textRenderer.getWidth(outside);
         int cubeWidth = client.textRenderer.getWidth(cube);
 
         HudCoords coords = calculateCoords(client, outsideWidth, cubeWidth);
 
-        int baseColor = color.getFormatting().getColorValue() != null
-                ? color.getFormatting().getColorValue()
-                : 0xFFFFFF;
-        int finalColor = ((int) (alpha * 255F) << 24) | (baseColor & 0xFFFFFF);
+        int finalColor = ((int) (alpha * 255F) << 24) | 0xFFFFFF;
 
         context.drawTextWithShadow(client.textRenderer, outside, coords.textX(), coords.y(), finalColor);
         context.drawTextWithShadow(client.textRenderer, cube, coords.cubeX(), coords.y(), finalColor);
