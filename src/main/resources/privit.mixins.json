@@ -100,6 +100,8 @@
     "throw_potions.SplashPotionMixin",
     "throw_snowballs.SnowballCollisionMixin",
     "throw_wind_charges.WindChargeEntityMixin",
+    "use_bone_meal.BoneMealItemMixin",
+    "use_bone_meal.BoneMealPlacementMixin",
     "use_fire_starters.AbstractFireSpreadProtectionMixin",
     "use_fire_starters.FireballCollisionMixin",
     "use_fire_starters.FireSpreadProtectionMixin",

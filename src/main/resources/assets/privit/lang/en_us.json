@@ -64,6 +64,7 @@
   "privit.rule.interact_with_minecarts.name": "Minecarts",
   "privit.rule.use_fluids.name": "Fluids",
   "privit.rule.press_buttons.name": "Buttons",
+  "privit.rule.use_bone_meal.name": "Bone meal",
   "privit.rule.use_leashes.name": "Leashes",
   "privit.rule.use_fishing_rods.name": "Fishing rods",
   "privit.rule.use_fire_starters.name": "Fire starters",
@@ -103,6 +104,7 @@
   "privit.rule.interact_with_minecarts.description": "Interact with minecarts\nIf this rule is §n§coff§r, members of this\ngroup cannot interact with any minecarts\nin this region:\n- place minecarts by hand or dispenser\n- break minecarts\n- board and control minecarts\n- push minecarts",
   "privit.rule.use_fluids.description": "Use fluids\nIf this rule is §n§coff§r, members of this\ngroup cannot place or remove fluids\nin this region.\nFluids placed outside will not flow in.\nAttempts to melt ice blocks inside\nthe region are also prevented.",
   "privit.rule.press_buttons.description": "Press buttons\nIf this rule is §n§coff§r, members of this\ngroup cannot interact with buttons\nin this region:\n- press buttons by hand\n- activate pressure plates",
+  "privit.rule.use_bone_meal.description": "Use bone meal\nIf this rule is §n§coff§r, members of this\ngroup cannot use bone meal\nfor growing plants in this region:\n- by hand or dispenser\n- using bone meal near the region's border\nwill prevent plants from spreading inward",
   "privit.rule.use_leashes.description": "Use leashes\nIf this rule is §n§coff§r, members of this\ngroup cannot use leashes in this region:\n- leash entities\n- the leash will break if the player\n  walks through the region while holding\n  a leashed entity",
   "privit.rule.use_fishing_rods.description": "Use fishing rods\nIf this rule is §n§coff§r, members of this\ngroup cannot use fishing rods\nin this region:\n- casting is blocked\n- attempts to cast a line onto the\n  region territory are interrupted",
   "privit.rule.use_fire_starters.description": "Use fire starters\nIf this rule is §n§coff§r, members of this\ngroup cannot start fires in this region:\n- with flint and steel, fire charges, etc.\n  by hand or dispenser\n- fire created outside by these members\n  will not spread into the region",
@@ -176,6 +178,7 @@
   "privit.notification.deny_use_trial_mechanics": "You cannot use trial mechanics in this region",
   "privit.notification.deny_spread_sculk": "You cannot spread sculk in this region",
   "privit.notification.deny_block_fall": "You cannot drop falling blocks into this region",
+  "privit.notification.deny_use_bone_meal": "You cannot use bone meal in this region",
 
   "privit.command.help.header": "===== Privit commands =====",
   "privit.command.help.help": "/privit help — list available commands",

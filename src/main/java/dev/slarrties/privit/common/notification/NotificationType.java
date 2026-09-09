@@ -60,5 +60,6 @@ public enum NotificationType {
     DENY_USE_PISTON,
     DENY_USE_TRIAL_MECHANICS,
     DENY_SPREAD_SCULK,
-    DENY_BLOCK_FALL
+    DENY_BLOCK_FALL,
+    DENY_USE_BONE_MEAL
 }

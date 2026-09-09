@@ -79,6 +79,7 @@ public class NotificationHudOverlay implements HudRenderCallback {
             case DENY_USE_TRIAL_MECHANICS -> "privit.notification.deny_use_trial_mechanics";
             case DENY_SPREAD_SCULK -> "privit.notification.deny_spread_sculk";
             case DENY_BLOCK_FALL -> "privit.notification.deny_block_fall";
+            case DENY_USE_BONE_MEAL -> "privit.notification.deny_use_bone_meal";
         };
 
         currentMessage = Text.translatable(translationKey).getString();

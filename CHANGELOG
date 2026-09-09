@@ -23,3 +23,10 @@
 
 ### Changed
 - Adjusted the color tones used for the region HUD and grid.
+
+
+
+## 1.2.0 — 10-09-2026
+
+### Added
+- new rule USE_BONE_MEAL has been added — players cannot use bone meal for growing plants in this region: by hand or dispenser, using bone meal near the region's border will prevent plants from spreading inward.

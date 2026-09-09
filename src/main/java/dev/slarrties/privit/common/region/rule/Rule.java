@@ -24,6 +24,7 @@ public enum Rule {
     USE_FLUIDS,
     PRESS_BUTTONS,
     USE_PISTONS,
+    USE_BONE_MEAL,
     USE_LEASHES,
     USE_FISHING_RODS,
     USE_FIRE_STARTERS,

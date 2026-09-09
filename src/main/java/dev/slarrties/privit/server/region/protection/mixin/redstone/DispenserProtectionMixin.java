@@ -7,6 +7,7 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
+import dev.slarrties.privit.server.tracking.context.BoneMealUseContext;
 import dev.slarrties.privit.server.tracking.protection.FireOriginTracker;
 import dev.slarrties.privit.server.tracking.protection.FluidOriginTracker;
 import dev.slarrties.privit.server.tracking.redstone.DispenserEntityAssigner;
@@ -48,7 +49,8 @@ import java.util.UUID;
         Rule.INTERACT_WITH_MINECARTS,
         Rule.THROW_WIND_CHARGES,
         Rule.CAUSE_EXPLOSIONS,
-        Rule.USE_FLUIDS
+        Rule.USE_FLUIDS,
+        Rule.USE_BONE_MEAL
 })
 @Mixin(DispenserBlock.class)
 public abstract class DispenserProtectionMixin {
@@ -67,6 +69,24 @@ public abstract class DispenserProtectionMixin {
         ItemStack stack = dispenser.getStack(slot);
         Direction facing = state.get(DispenserBlock.FACING);
         BlockPos targetPos = pos.offset(facing);
+
+        if (stack.isOf(Items.BONE_MEAL)) {
+            UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverWorld, pos);
+
+            if (responsible != null) BoneMealUseContext.push(responsible, targetPos);
+            if (!RegionPermissionChecker.isAllowed(responsible, Rule.USE_BONE_MEAL, targetPos, serverWorld)) {
+                ServerPlayerEntity serverPlayer = serverWorld.getServer()
+                        .getPlayerManager()
+                        .getPlayer(responsible);
+                PlayerNotification.trySend(serverPlayer, NotificationType.DENY_USE_BONE_MEAL, Color.RED);
+                serverWorld.syncWorldEvent(1001, pos, 0);
+                BoneMealUseContext.pop();
+                ci.cancel();
+            }
+
+            return;
+        }
+
         Rule rule = getRuleForInstantCancel(stack);
 
         if (rule != null) {
@@ -159,6 +179,12 @@ public abstract class DispenserProtectionMixin {
         }
 
         DispenserEntityAssigner.assignOwner(world, pos, null, stack);
+    }
+
+    @Inject(method = "dispense(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/block/BlockState;Lnet/minecraft/util/math/BlockPos;)V",
+            at = @At("RETURN"))
+    private void popBoneMealContext(ServerWorld world, BlockState state, BlockPos pos, CallbackInfo ci) {
+        BoneMealUseContext.pop();
     }
 
     @Unique
