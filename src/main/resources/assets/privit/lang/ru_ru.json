@@ -190,7 +190,6 @@
   "privit.command.help.grid_one": "/privit grid <uuid> <on|off> — показать/скрыть сетку региона",
   "privit.command.help.addowner": "/privit addowner <uuid> <player> — добавить игрока в группу владельцев региона",
   "privit.command.help.here": "/privit here — владельцы региона по текущей позиции",
-
   "privit.command.reload.success": "Конфигурация Privit перезагружена",
   "privit.command.reload.fail": "Не удалось перезагрузить конфигурацию: %s",
   "privit.command.regions.header": "===== Регионы игрока %s =====",
@@ -212,6 +211,22 @@
   "privit.command.here.header": "=== Регион: %s ===",
   "privit.command.here.owners": "Владельцы:",
   "privit.command.here.no_owners": "Группа владельцев пуста",
-  "privit.command.addowner.failed": "failed to add owner",
-  "privit.command.delete.failed": "failed to delete region"
+  "privit.command.addowner.failed": "ошибка при добавлении владельца",
+  "privit.command.delete.failed": "ошибка при удалении региона",
+
+  "privit.config.missing_cloth.title": "Зависимости не найдены!",
+  "privit.config.missing_cloth.message": "Вам нужно установить Cloth Config, чтобы использовать данное меню.",
+  "privit.config.title": "Конфигурационное меню Privit",
+  "privit.config.category.hud": "Позиция HUD",
+  "privit.config.hud.region_name_position": "Позиция HUD с названием региона",
+  "privit.config.hud.region_name_position.tooltip": "Позиция виджета с названием на экране.\n Доступные варианты:\nTOP_LEFT - слева сверху\nTOP_RIGHT - справа сверху \nBOTTOM_LEFT - слева внизу \nBOTTOM_RIGHT - справа внизу",
+  "privit.config.category.region_limits": "Лимиты регионов",
+  "privit.config.limits.max_area": "Максимальная площадь региона (в блоках)",
+  "privit.config.limits.max_area.tooltip": "Максимально допустимая площадь региона.\nесли игрок попытается создать или изменить существующий регион,\nпри превышении лимита действие отклонится.\n0 или отриц. значение убирает лимит",
+  "privit.config.limits.max_regions_per_player": "Максимальное число регионов на игрока",
+  "privit.config.limits.max_regions_per_player.tooltip": "Максимальное число регионов, которыми может владеть игрок.\nЛимит проверяется при создании нового региона.\n0 или отриц. значение убирает лимит",
+  "privit.config.category.default_rules": "Состояние правил по умолчанию",
+  "privit.config.default_rules.tooltip": "Состояние правил при создании новой группы.\nВы можете настроить их для своего удобства\nчтобы не корректировать настройки при каждом создании новой группы: \ntrue - правило по умолчанию активно\nfalse - правило по умолчанию отключено",
+  "privit.config.category.frozen_rules": "Заморозка правил",
+  "privit.config.frozen_rules.tooltip": "Замороженные правила игнорируются и скрываются из всех списков.\nЕсли правило размораживается, в каждом регионе восстанавливается\nзначение правила на момент заморозки."
 }

@@ -30,3 +30,12 @@
 
 ### Added
 - new rule USE_BONE_MEAL has been added — players cannot use bone meal for growing plants in this region: by hand or dispenser, using bone meal near the region's border will prevent plants from spreading inward.
+
+
+
+## 1.3.0 — 11-09-2026
+
+### Added
+- mod menu support has been added — now you can change the mod configuration directly in the game.
+To apply the changes, you need to reload the world or use the `/privit reload` command.
+To support the menu functionality, you need to install mod menu and cloth config, but they are not required for the mod to work.

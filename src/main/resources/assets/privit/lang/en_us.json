@@ -190,7 +190,6 @@
   "privit.command.help.grid_one": "/privit grid <uuid> <on|off> — show or hide a region outline",
   "privit.command.help.addowner": "/privit addowner <uuid> <player> — add a player to the region owner group",
   "privit.command.help.here": "/privit here — owners of the region at your position",
-
   "privit.command.reload.success": "Privit configuration reloaded",
   "privit.command.reload.fail": "Failed to reload config: %s",
   "privit.command.regions.header": "=== Regions of player %s ===",
@@ -213,5 +212,21 @@
   "privit.command.here.owners": "Owners:",
   "privit.command.here.no_owners": "Owner group is empty",
   "privit.command.addowner.failed": "failed to add owner",
-  "privit.command.delete.failed": "failed to delete region"
+  "privit.command.delete.failed": "failed to delete region",
+
+  "privit.config.missing_cloth.title": "Dependencies is missing!",
+  "privit.config.missing_cloth.message": "You need to install Cloth Config to use the menu.",
+  "privit.config.title": "Privit configuration menu",
+  "privit.config.category.hud": "HUD position",
+  "privit.config.hud.region_name_position": "Region name HUD position",
+  "privit.config.hud.region_name_position.tooltip": "Position of the region name widget on the screen.\n Allowed values:\nTOP_LEFT\nTOP_RIGHT\nBOTTOM_LEFT\nBOTTOM_RIGHT",
+  "privit.config.category.region_limits": "Region limits",
+  "privit.config.limits.max_area": "Region max area allowed (in blocks)",
+  "privit.config.limits.max_area.tooltip": "Maximum region size in blocks.\nIf a player tries to create or resize a region beyond this value,\nthe operation will be denied.\n0 or a negative value disables this limit.",
+  "privit.config.limits.max_regions_per_player": "Max regions per player",
+  "privit.config.limits.max_regions_per_player.tooltip": "Maximum number of regions a single player can own.\nThis limit is checked when a new region is created.\n0 or a negative value disables this limit.",
+  "privit.config.category.default_rules": "Default rule state",
+  "privit.config.default_rules.tooltip": "Default rule states applied when a new group is created.\nYou can adjust the default state as you like\nto minimize the setting each time you create a new group or region: \ntrue - the rule is enabled by default\nfalse - the rule is disabled by default",
+  "privit.config.category.frozen_rules": "Frozen rules",
+  "privit.config.frozen_rules.tooltip": "Frozen rules are not evaluated and are hidden from all rule lists.\nIf a rule is later unfrozen, its previous state is restored in every region\nto the value it had at the moment it was frozen."
 }

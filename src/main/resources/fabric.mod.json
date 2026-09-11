@@ -17,7 +17,8 @@
 	"entrypoints": {
 		"main": [ "dev.slarrties.privit.PrivitMod" ],
 		"client": [ "dev.slarrties.privit.client.PrivitClient" ],
-		"server": ["dev.slarrties.privit.server.PrivitServer"]
+		"server": ["dev.slarrties.privit.server.PrivitServer"],
+		"modmenu": [ "dev.slarrties.privit.client.config.ModMenuIntegration" ]
 	},
 	"mixins": [
 		"privit.mixins.json"
@@ -29,6 +30,7 @@
 		"fabric-api": "*"
 	},
 	"suggests": {
-		"modmenu": "*"
+		"modmenu": "*",
+		"cloth-config": "*"
 	}
 }
