@@ -28,7 +28,7 @@ public class PrivitMod implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		ConfigManager.init();
-		FrozenRules.load();
+		FrozenRules.init();
 		BlocksRegistry.register();
 		PayloadRegistry.register();
 		BlockEntityRegistry.register();

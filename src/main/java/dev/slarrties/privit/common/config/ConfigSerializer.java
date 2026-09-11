@@ -3,14 +3,21 @@ package dev.slarrties.privit.common.config;
 import com.electronwill.nightconfig.core.Config;
 import com.electronwill.nightconfig.core.CommentedConfig;
 
+import dev.slarrties.privit.common.region.rule.Rule;
 import dev.slarrties.privit.common.config.annotation.ConfigValue;
 import dev.slarrties.privit.common.config.annotation.ConfigIgnore;
 import dev.slarrties.privit.common.config.annotation.ConfigSection;
+import dev.slarrties.privit.common.config.sections.DefaultRulesSection;
+import dev.slarrties.privit.common.config.sections.FrozenRulesSection;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.List;
+import java.util.Locale;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
@@ -32,8 +39,133 @@ public final class ConfigSerializer {
 
     public static void writeDefaultSections(CommentedConfig raw, Iterable<Object> sections) {
         for (Object section : sections) {
+            ConfigSection meta = requireSection(section);
+
+            raw.remove(meta.path());
             writeDefaultSection(raw, section);
         }
+    }
+
+    public static void normalize(PrivitConfig config) {
+        normalizeDefaultRules(config.defaultRules);
+        normalizeFrozenRules(config.frozenRules);
+    }
+
+    public static boolean isSchemaCurrent(CommentedConfig raw, PrivitConfig config) {
+        for (Object section : config.sections()) {
+            if (!isSectionCurrent(raw, section)) return false;
+        }
+        return true;
+    }
+
+    // ─────────────────────────────────────────────
+    // Schema
+    // ─────────────────────────────────────────────
+
+    private static void normalizeDefaultRules(DefaultRulesSection section) {
+        Map<String, Boolean> source = section.rules != null ? section.rules : Map.of();
+        Map<String, Boolean> normalized = new LinkedHashMap<>();
+
+        for (Rule rule : Rule.values()) {
+            if (rule == Rule.MANAGE) continue;
+
+            String key = rule.name();
+            Boolean value = source.get(key);
+            if (value == null) {
+                value = findIgnoreCase(source, key);
+            }
+            normalized.put(key, value != null ? value : Boolean.FALSE);
+        }
+
+        section.rules = normalized;
+    }
+
+    private static void normalizeFrozenRules(FrozenRulesSection section) {
+        Set<String> known = knownRuleNames();
+        Set<String> normalized = new LinkedHashSet<>();
+
+        List<String> source = section.disabled != null ? section.disabled : List.of();
+        for (String raw : source) {
+            if (raw == null || raw.isBlank()) continue;
+            String key = raw.trim().toUpperCase(Locale.ROOT);
+            if (known.contains(key)) normalized.add(key);
+        }
+
+        section.disabled = new ArrayList<>(normalized);
+    }
+
+    private static boolean isSectionCurrent(CommentedConfig raw, Object section) {
+        ConfigSection meta = requireSection(section);
+        String prefix = meta.path();
+
+        for (Field field : section.getClass().getDeclaredFields()) {
+            if (!isConfigField(field)) continue;
+
+            ConfigValue valueMeta = field.getAnnotation(ConfigValue.class);
+            String key = resolveKey(field, valueMeta);
+            String path = prefix + "." + key;
+
+            try {
+                field.setAccessible(true);
+                Object value = field.get(section);
+                if (!isValueCurrent(raw, path, value)) return false;
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException("Failed to inspect config field: " + path, e);
+            }
+        }
+
+        return true;
+    }
+
+    private static boolean isValueCurrent(CommentedConfig raw, String path, Object value) {
+        if (!raw.contains(path)) return false;
+
+        if (value instanceof Map<?, ?> map) {
+            Object tableObj = raw.get(path);
+            if (!(tableObj instanceof Config table)) return false;
+
+            Set<String> expected = new LinkedHashSet<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (!(entry.getKey() instanceof String key)) return false;
+                expected.add(key);
+                if (!table.contains(key)) return false;
+            }
+
+            for (Config.Entry entry : table.entrySet()) {
+                if (!expected.contains(entry.getKey())) return false;
+            }
+            return true;
+        }
+
+        if (value instanceof List<?> list) {
+            List<String> expected = new ArrayList<>();
+            for (Object element : list) {
+                expected.add(String.valueOf(element));
+            }
+
+            List<String> actual = raw.getOrElse(path, new ArrayList<>());
+            return expected.equals(actual);
+        }
+
+        return true;
+    }
+
+    private static Boolean findIgnoreCase(Map<String, Boolean> source, String key) {
+        for (Map.Entry<String, Boolean> entry : source.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(key)) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    private static Set<String> knownRuleNames() {
+        Set<String> names = new HashSet<>();
+        for (Rule rule : Rule.values()) {
+            if (rule == Rule.MANAGE) continue;
+            names.add(rule.name());
+        }
+        return names;
     }
 
     // ─────────────────────────────────────────────

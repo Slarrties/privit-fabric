@@ -26,9 +26,16 @@ public class RuleSettings implements RuleFreezeObserver, AutoCloseable {
         this.groupName = original.groupName;
         this.activeRules = new EnumMap<>(original.activeRules);
         this.frozenStates = new EnumMap<>(original.frozenStates);
-
         register();
-        syncWithCurrentFreezeState();
+    }
+
+    private RuleSettings(String groupName, boolean hydrateDefaults) {
+        this.groupName = groupName;
+        register();
+        if (hydrateDefaults) {
+            initializeDefaults();
+            syncWithCurrentFreezeState();
+        }
     }
 
     private void register() {
@@ -130,7 +137,7 @@ public class RuleSettings implements RuleFreezeObserver, AutoCloseable {
     }
 
     public static RuleSettings readFromBuf(PacketByteBuf buf, String groupName) {
-        RuleSettings settings = new RuleSettings(groupName);
+        RuleSettings settings = new RuleSettings(groupName, false);
 
         int activeCount = buf.readVarInt();
         for (int i = 0; i < activeCount; i++) {
@@ -146,7 +153,6 @@ public class RuleSettings implements RuleFreezeObserver, AutoCloseable {
             settings.frozenStates.put(rule, enabled);
         }
 
-        settings.syncWithCurrentFreezeState();
         return settings;
     }
 

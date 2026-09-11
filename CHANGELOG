@@ -39,3 +39,15 @@
 - mod menu support has been added — now you can change the mod configuration directly in the game.
 To apply the changes, you need to reload the world or use the `/privit reload` command.
 To support the menu functionality, you need to install mod menu and cloth config, but they are not required for the mod to work.
+
+
+
+## 1.3.1 — 12-09-2026
+
+### Bugfix
+- Fixed the bug, when configuration changes made via mod menu were not saved to the config file (privit.toml).
+
+- Fixed the bug, when updating the config on a dedicated server, did not update the visible list of available rules in GUI.
+
+### Changed
+- Config file created for older versions of the mod will now automatically receive all the necessary parameters when the game is launched (including if the parameters were deleted intentionally or by mistake).

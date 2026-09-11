@@ -8,12 +8,15 @@ import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 
 import net.fabricmc.loader.api.FabricLoader;
 
+import java.util.List;
+import java.util.ArrayList;
 import java.nio.file.Path;
 
 public final class ConfigManager {
 
     private static PrivitConfig config;
     private static CommentedFileConfig fileConfig;
+    private static final List<ConfigReloadListener> listeners = new ArrayList<>();
 
     private ConfigManager() {}
 
@@ -29,13 +32,7 @@ public final class ConfigManager {
                 .build();
 
         fileConfig.load();
-
-        if (fileConfig.isEmpty()) {
-            writeDefaults(fileConfig);
-            fileConfig.save();
-        }
-
-        config = readFrom(fileConfig);
+        loadAndReconcile();
     }
 
     public static PrivitConfig get() {
@@ -47,13 +44,45 @@ public final class ConfigManager {
     public static void reload() {
         if (fileConfig == null) return;
         fileConfig.load();
-        config = readFrom(fileConfig);
+        loadAndReconcile();
     }
 
     public static void save() {
         if (fileConfig == null || config == null) return;
         writeTo(fileConfig, config);
         fileConfig.save();
+        notifyListeners();
+    }
+
+    public static void addListener(ConfigReloadListener listener) {
+        if (listener == null || listeners.contains(listener)) return;
+        listeners.add(listener);
+    }
+
+    public static void removeListener(ConfigReloadListener listener) {
+        listeners.remove(listener);
+    }
+
+    private static void loadAndReconcile() {
+        PrivitConfig loaded = readFrom(fileConfig);
+        ConfigSerializer.normalize(loaded);
+
+        if (fileConfig.isEmpty() || !ConfigSerializer.isSchemaCurrent(fileConfig, loaded)) {
+            ConfigSerializer.writeDefaultSections(fileConfig, loaded.sections());
+            fileConfig.save();
+        }
+
+        config = loaded;
+        notifyListeners();
+    }
+
+    private static void notifyListeners() {
+        if (config == null || listeners.isEmpty()) return;
+
+        PrivitConfig current = config;
+        for (ConfigReloadListener listener : List.copyOf(listeners)) {
+            listener.onConfigReloaded(current);
+        }
     }
 
     private static PrivitConfig readFrom(CommentedConfig raw) {
@@ -64,10 +93,5 @@ public final class ConfigManager {
 
     private static void writeTo(CommentedConfig raw, PrivitConfig cfg) {
         ConfigSerializer.writeSections(raw, cfg.sections());
-    }
-
-    private static void writeDefaults(CommentedConfig raw) {
-        PrivitConfig defaults = new PrivitConfig();
-        ConfigSerializer.writeDefaultSections(raw, defaults.sections());
     }
 }
