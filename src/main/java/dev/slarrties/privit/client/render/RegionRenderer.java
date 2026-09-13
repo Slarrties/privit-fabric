@@ -1,5 +1,6 @@
 package dev.slarrties.privit.client.render;
 
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.BlockBox;
 import net.minecraft.util.math.Direction;
 import net.minecraft.client.util.math.MatrixStack;
@@ -222,14 +223,8 @@ public class RegionRenderer {
         }
     }
 
-    public void renderEdges(List<RegionRenderEntry> entries, WorldRenderContext context) {
+    public void renderEdges(List<RegionRenderEntry> entries, VertexConsumer edgeBuffer, Matrix4f matrix) {
         if (entries.isEmpty()) return;
-
-        VertexConsumerProvider consumers = context.consumers();
-        if (consumers == null) return;
-
-        VertexConsumer edgeBuffer = consumers.getBuffer(RegionRenderLayers.EDGE_LAYER);
-        Matrix4f matrix = context.matrixStack().peek().getPositionMatrix();
 
         Set<NormalizedEdge> drawnEdges = new HashSet<>();
 
@@ -245,13 +240,105 @@ public class RegionRenderer {
             }
 
             if (entry.hasOriginal()) {
-                drawBoxEdgesNonIntersecting(entry.original(), edgeBuffer, matrix, false, r, g, b, a, entry.conflicts(), drawnEdges);
+                drawBoxEdgesNonIntersecting(
+                        entry.original(), edgeBuffer, matrix, false, r, g, b, a,
+                        entry.conflicts(), drawnEdges
+                );
             }
 
             if (entry.hasDraft()) {
-                drawBoxEdgesNonIntersecting(entry.draft(), edgeBuffer, matrix, true, r, g, b, a, entry.conflicts(), drawnEdges);
+                drawBoxEdgesNonIntersecting(
+                        entry.draft(), edgeBuffer, matrix, true, r, g, b, a,
+                        entry.conflicts(), drawnEdges
+                );
             }
         }
+    }
+
+    public void renderFacesPositionColor(List<RegionGeometry> geometries, VertexConsumer buffer, Matrix4f matrix) {
+        if (geometries == null || geometries.isEmpty()) return;
+
+        for (RegionGeometry geometry : geometries) {
+            if (geometry.isEmpty()) continue;
+
+            for (RegionFace face : geometry.getFaces()) {
+                float r = face.getRenderProperties().red();
+                float g = face.getRenderProperties().green();
+                float b = face.getRenderProperties().blue();
+                float a = face.getRenderProperties().alpha();
+
+                double[] coords = applyInset(face);
+                float minX = (float) coords[0], minY = (float) coords[1], minZ = (float) coords[2];
+                float maxX = (float) coords[3], maxY = (float) coords[4], maxZ = (float) coords[5];
+
+                float[] uvs = calculateUV(face.faceDirection(), minX, minY, minZ, maxX, maxY, maxZ);
+                emitQuadPositionTexColor(buffer, matrix, minX, minY, minZ, maxX, maxY, maxZ,
+                        face.faceDirection(), r, g, b, a, uvs);
+            }
+        }
+    }
+
+    private void emitQuadPositionTexColor(VertexConsumer buffer, Matrix4f mat,
+                                          float minX, float minY, float minZ,
+                                          float maxX, float maxY, float maxZ,
+                                          Direction dir, float r, float g, float b, float a,
+                                          float[] uvs) {
+        float u1 = uvs[0], v1 = uvs[1], u2 = uvs[2], v2 = uvs[3];
+        float u3 = uvs[4], v3 = uvs[5], u4 = uvs[6], v4 = uvs[7];
+
+        switch (dir) {
+            case DOWN  -> quadPosTexColor(buffer, mat, minX,minY,minZ, maxX,minY,minZ, maxX,minY,maxZ, minX,minY,maxZ, r,g,b,a, u1,v1,u2,v2,u3,v3,u4,v4);
+            case UP    -> quadPosTexColor(buffer, mat, minX,maxY,minZ, minX,maxY,maxZ, maxX,maxY,maxZ, maxX,maxY,minZ, r,g,b,a, u1,v1,u2,v2,u3,v3,u4,v4);
+            case NORTH -> quadPosTexColor(buffer, mat, minX,minY,minZ, maxX,minY,minZ, maxX,maxY,minZ, minX,maxY,minZ, r,g,b,a, u1,v1,u2,v2,u3,v3,u4,v4);
+            case SOUTH -> quadPosTexColor(buffer, mat, minX,minY,maxZ, minX,maxY,maxZ, maxX,maxY,maxZ, maxX,minY,maxZ, r,g,b,a, u1,v1,u2,v2,u3,v3,u4,v4);
+            case WEST  -> quadPosTexColor(buffer, mat, minX,minY,minZ, minX,minY,maxZ, minX,maxY,maxZ, minX,maxY,minZ, r,g,b,a, u1,v1,u2,v2,u3,v3,u4,v4);
+            case EAST  -> quadPosTexColor(buffer, mat, maxX,minY,minZ, maxX,maxY,minZ, maxX,maxY,maxZ, maxX,minY,maxZ, r,g,b,a, u1,v1,u2,v2,u3,v3,u4,v4);
+        }
+    }
+
+    private void quadPosTexColor(VertexConsumer buffer, Matrix4f mat,
+                                 float x1, float y1, float z1, float x2, float y2, float z2,
+                                 float x3, float y3, float z3, float x4, float y4, float z4,
+                                 float r, float g, float b, float a,
+                                 float u1, float v1, float u2, float v2, float u3, float v3, float u4, float v4) {
+        buffer.vertex(mat, x1, y1, z1).color(r, g, b, a).texture(u1, v1);
+        buffer.vertex(mat, x2, y2, z2).color(r, g, b, a).texture(u2, v2);
+        buffer.vertex(mat, x3, y3, z3).color(r, g, b, a).texture(u3, v3);
+        buffer.vertex(mat, x4, y4, z4).color(r, g, b, a).texture(u4, v4);
+    }
+
+    public void emitEdgeQuad(VertexConsumer buffer, Matrix4f matrix,
+                             double x1, double y1, double z1,
+                             double x2, double y2, double z2,
+                             Vec3d cameraWorld, float halfWidth,
+                             float r, float g, float b, float a) {
+        double dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
+        double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1e-4) return;
+
+        double mx = (x1 + x2) * 0.5 - cameraWorld.x;
+        double my = (y1 + y2) * 0.5 - cameraWorld.y;
+        double mz = (z1 + z2) * 0.5 - cameraWorld.z;
+
+        double cx = dy * mz - dz * my;
+        double cy = dz * mx - dx * mz;
+        double cz = dx * my - dy * mx;
+        double cl = Math.sqrt(cx * cx + cy * cy + cz * cz);
+        if (cl < 1e-4) {
+            cx = 0;
+            cy = 1;
+            cz = 0;
+            cl = 1;
+        }
+
+        double ox = cx / cl * halfWidth;
+        double oy = cy / cl * halfWidth;
+        double oz = cz / cl * halfWidth;
+
+        buffer.vertex(matrix, (float) (x1 - ox), (float) (y1 - oy), (float) (z1 - oz)).color(r, g, b, a);
+        buffer.vertex(matrix, (float) (x1 + ox), (float) (y1 + oy), (float) (z1 + oz)).color(r, g, b, a);
+        buffer.vertex(matrix, (float) (x2 + ox), (float) (y2 + oy), (float) (z2 + oz)).color(r, g, b, a);
+        buffer.vertex(matrix, (float) (x2 - ox), (float) (y2 - oy), (float) (z2 - oz)).color(r, g, b, a);
     }
 
     private void drawBoxEdgesNonIntersecting(BlockBox box, VertexConsumer buffer, Matrix4f matrix,
@@ -370,9 +457,19 @@ public class RegionRenderer {
                 z >= box.getMinZ() && z <= box.getMaxZ() + 1;
     }
 
-    private void emitSolidLine(VertexConsumer buffer, Matrix4f matrix, NormalizedEdge edge, float r, float g, float b, float a) {
-        buffer.vertex(matrix, (float) edge.x1, (float) edge.y1, (float) edge.z1).color(r, g, b, a).normal(0, 0, 0);
-        buffer.vertex(matrix, (float) edge.x2, (float) edge.y2, (float) edge.z2).color(r, g, b, a).normal(0, 0, 0);
+    private void emitSolidLine(VertexConsumer buffer, Matrix4f matrix,
+                               NormalizedEdge edge, float r, float g, float b, float a) {
+        float dx = (float) (edge.x2() - edge.x1());
+        float dy = (float) (edge.y2() - edge.y1());
+        float dz = (float) (edge.z2() - edge.z1());
+        float len = Math.max((float) Math.sqrt(dx * dx + dy * dy + dz * dz), 1e-6f);
+
+        buffer.vertex(matrix, (float) edge.x1(), (float) edge.y1(), (float) edge.z1())
+                .color(r, g, b, a)
+                .normal(dx / len, dy / len, dz / len);
+        buffer.vertex(matrix, (float) edge.x2(), (float) edge.y2(), (float) edge.z2())
+                .color(r, g, b, a)
+                .normal(dx / len, dy / len, dz / len);
     }
 
     private void emitDashedLine(VertexConsumer buffer, Matrix4f matrix, NormalizedEdge edge, float r, float g, float b, float a) {
