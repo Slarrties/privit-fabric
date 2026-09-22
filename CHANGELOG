@@ -67,3 +67,12 @@ To support the menu functionality, you need to install mod menu and cloth config
 
 ### Added
 - new rule TRIGGER_RAIDS has been added — players cannot trigger raids in this region: the raid begin will be interrupted if a player with “bad omen” effect and/or the village center are within the region. Raiders will not be able to spawn in the region. Ravagers cannot break crops and leaves blocks. To prevent raiders from dealing damage to villagers, disable the ATTACK_PASSIVE_ENTITY rule,
+
+
+
+## 1.4.1 — 23-09-2026
+
+### Fixed
+- Fixed a vulnerability where a player with a disabled TRIGGER_RAIDS rule could drink an ominous bottle in a region .
+
+- Fixed a vulnerability in which a player with a disabled BUILD rule, as well as mobs under its influence, could trample beds in the region.

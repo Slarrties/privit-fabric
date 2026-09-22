@@ -7,6 +7,7 @@ import dev.slarrties.privit.server.region.protection.handler.interact_with_boats
 import dev.slarrties.privit.server.region.protection.handler.interact_with_containers.InteractContainersHandler;
 import dev.slarrties.privit.server.region.protection.handler.interact_with_minecarts.InteractionMinecartHandler;
 import dev.slarrties.privit.server.region.protection.handler.interact_with_signs.InteractSignHandler;
+import dev.slarrties.privit.server.region.protection.handler.trigger_raids.DrinkOminousBottleHandler;
 import dev.slarrties.privit.server.region.protection.handler.use_spawn_eggs.SpawnedEntityHandler;
 import dev.slarrties.privit.server.region.protection.handler.use_trial_mechanics.InteractTrialSpawnerHandler;
 import dev.slarrties.privit.server.region.protection.handler.use_trial_mechanics.InteractVaultHandler;
@@ -52,6 +53,7 @@ public final class HandlerRegistry {
         register(new InteractTrialSpawnerHandler());
         register(new InteractVaultHandler());
         register(new SpawnedEntityHandler());
+        register(new DrinkOminousBottleHandler());
     }
 
     private static void register(RuleEventHandler handler) {
