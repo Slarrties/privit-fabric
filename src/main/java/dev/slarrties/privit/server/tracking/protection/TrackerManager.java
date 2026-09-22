@@ -41,6 +41,7 @@ public final class TrackerManager {
     private final HeatSourceOriginTracker heatSourceOriginTracker;
     private final CampfireOriginTracker campfireOriginTracker;
     private final BlockFallOriginTracker blockFallOriginTracker;
+    private final RaidOriginTracker raidOriginTracker;
 
     public TrackerManager(ServerWorld world) {
         this.world = world;
@@ -61,6 +62,7 @@ public final class TrackerManager {
         this.heatSourceOriginTracker = new HeatSourceOriginTracker(world);
         this.campfireOriginTracker = new CampfireOriginTracker(world);
         this.blockFallOriginTracker = new BlockFallOriginTracker(world);
+        this.raidOriginTracker = new RaidOriginTracker(world);
 
         registerAll();
 
@@ -90,6 +92,7 @@ public final class TrackerManager {
         allTrackers.add(heatSourceOriginTracker);
         allTrackers.add(campfireOriginTracker);
         allTrackers.add(blockFallOriginTracker);
+        allTrackers.add(raidOriginTracker);
     }
 
     public void onServerTick() {
@@ -156,6 +159,7 @@ public final class TrackerManager {
     public HeatSourceOriginTracker getHeatSourceOriginTracker() { return heatSourceOriginTracker; }
     public CampfireOriginTracker getCampfireOriginTracker() { return campfireOriginTracker; }
     public BlockFallOriginTracker getBlockFallOriginTracker() { return blockFallOriginTracker; }
+    public RaidOriginTracker getRaidOriginTracker() { return raidOriginTracker; }
 
     public NbtCompound saveToNbt() {
         NbtCompound root = new NbtCompound();

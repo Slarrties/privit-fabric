@@ -41,6 +41,7 @@ public enum Rule {
     CREATE_NETHER_PORTALS,
     CAUSE_BLOCK_FALL,
     SPREAD_SCULK,
+    TRIGGER_RAIDS,
     PUSH_ENTITIES;
 
     public Text getName() {
