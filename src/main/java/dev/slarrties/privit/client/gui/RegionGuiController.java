@@ -1,7 +1,8 @@
 package dev.slarrties.privit.client.gui;
 
+import dev.slarrties.privit.client.network.ClientPacketSender;
 import dev.slarrties.privit.common.network.payload.c2s.RegionGuiUpdateC2SPacket;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+
 import java.util.function.Consumer;
 
 public class RegionGuiController {
@@ -12,7 +13,7 @@ public class RegionGuiController {
 
     public RegionGuiController(RegionGuiLocalState initialState) {
         this.localState = initialState;
-        this.updateSender = ClientPlayNetworking::send;
+        this.updateSender = ClientPacketSender::send;
     }
 
     public RegionGuiLocalState getLocalState() {

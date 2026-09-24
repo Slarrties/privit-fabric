@@ -2,6 +2,7 @@ package dev.slarrties.privit.client.gui.screen;
 
 import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.client.gui.RegionGuiController;
+import dev.slarrties.privit.client.gui.widget.ButtonTextures;
 import dev.slarrties.privit.client.gui.widget.CustomTextField;
 import dev.slarrties.privit.client.gui.widget.GuiButton;
 import dev.slarrties.privit.client.gui.widget.list.PlayerSearchList;
@@ -9,17 +10,16 @@ import dev.slarrties.privit.client.util.ClientPlayerIdentityCache;
 import dev.slarrties.privit.common.util.PlayerIdentity;
 import dev.slarrties.privit.common.region.RegionGroups;
 import dev.slarrties.privit.common.region.RegionPlayerGroup;
+import dev.slarrties.privit.client.network.ClientPacketSender;
 import dev.slarrties.privit.common.network.payload.c2s.RegionGuiUpdateC2SPacket;
 import dev.slarrties.privit.common.network.payload.c2s.SearchPlayersRequestC2SPacket;
 
-import net.minecraft.client.gui.screen.ButtonTextures;
-import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.screen.Screen;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 
 import java.util.List;
 import java.util.Optional;
@@ -114,7 +114,7 @@ public class AddPlayerScreen extends Screen {
         refreshPlayerList(trimmed);
 
         if (!trimmed.isEmpty() && trimmed.length() >= 2) {
-            ClientPlayNetworking.send(new SearchPlayersRequestC2SPacket(trimmed, 50));
+            ClientPacketSender.send(new SearchPlayersRequestC2SPacket(trimmed, 50));
         }
     }
 
@@ -179,12 +179,12 @@ public class AddPlayerScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
+        renderBackground(context);
         super.render(context, mouseX, mouseY, delta);
     }
 
     @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void renderBackground(DrawContext context) {
         int x = (width - BG_WIDTH) / 2;
         int y = (height - BG_HEIGHT) / 2;
         context.fillGradient(0, 0, width, height, 0xC0101010, 0xD0101010);
@@ -200,10 +200,10 @@ public class AddPlayerScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (playerList.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double verticalAmount) {
+        if (playerList.mouseScrolled(mouseX, mouseY, verticalAmount)) {
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+        return super.mouseScrolled(mouseX, mouseY, verticalAmount);
     }
 }

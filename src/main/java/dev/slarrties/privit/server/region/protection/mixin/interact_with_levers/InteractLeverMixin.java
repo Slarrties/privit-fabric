@@ -7,6 +7,7 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
+import net.minecraft.util.Hand;
 import net.minecraft.world.World;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.hit.BlockHitResult;
@@ -27,8 +28,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class InteractLeverMixin {
 
     @Inject(method = "onUse", at = @At("HEAD"), cancellable = true)
-    private void preventLeverUse(BlockState state, World world, BlockPos pos,
-                                 PlayerEntity player, BlockHitResult hit, CallbackInfoReturnable<ActionResult> cir) {
+    private void preventLeverUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand,
+                                 BlockHitResult hit, CallbackInfoReturnable<ActionResult> cir) {
         if (!(player instanceof ServerPlayerEntity serverPlayer)) return;
 
         boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_LEVERS, pos);

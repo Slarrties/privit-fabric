@@ -126,8 +126,9 @@ public final class RegionRenderManager {
             };
             RenderSystem.setShaderTexture(0, texture);
 
-            BufferBuilder fill = Tessellator.getInstance()
-                    .begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
+            BufferBuilder fill = Tessellator.getInstance().getBuffer();
+            fill.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
+
             RENDERER.renderFacesPositionColor(List.of(geometry), fill, matrix);
             BufferRenderer.drawWithGlobalProgram(fill.end());
         }
@@ -135,8 +136,9 @@ public final class RegionRenderManager {
         RenderSystem.depthFunc(org.lwjgl.opengl.GL11.GL_ALWAYS);
         RenderSystem.setShader(GameRenderer::getPositionColorProgram);
 
-        BufferBuilder edges = Tessellator.getInstance()
-                .begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+        BufferBuilder edges = Tessellator.getInstance().getBuffer();
+        edges.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+
         renderEdgesAsQuads(entries, edges, matrix, cameraPos);
         BufferRenderer.drawWithGlobalProgram(edges.end());
 
@@ -240,8 +242,8 @@ public final class RegionRenderManager {
         RenderSystem.setShader(GameRenderer::getRenderTypeLinesProgram);
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
 
-        BufferBuilder buffer = Tessellator.getInstance()
-                .begin(VertexFormat.DrawMode.LINES, VertexFormats.LINES);
+        BufferBuilder buffer = Tessellator.getInstance().getBuffer();
+        buffer.begin(VertexFormat.DrawMode.LINES, VertexFormats.LINES);
 
         RENDERER.renderEdges(entries, buffer, matrix);
 

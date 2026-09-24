@@ -14,19 +14,18 @@
 	"license": "All Rights Reserved",
 	"icon": "assets/privit/icon.png",
 	"environment": "*",
+	"accessWidener": "privit.accesswidener",
 	"entrypoints": {
-		"main": [ "dev.slarrties.privit.PrivitMod" ],
-		"client": [ "dev.slarrties.privit.client.PrivitClient" ],
+		"main": ["dev.slarrties.privit.PrivitMod"],
+		"client": ["dev.slarrties.privit.client.PrivitClient"],
 		"server": ["dev.slarrties.privit.server.PrivitServer"],
-		"modmenu": [ "dev.slarrties.privit.client.config.ModMenuIntegration" ]
+		"modmenu": ["dev.slarrties.privit.client.config.ModMenuIntegration"]
 	},
-	"mixins": [
-		"privit.mixins.json"
-	],
+	"mixins": ["privit.mixins.json"],
 	"depends": {
-		"fabricloader": ">=0.18.1",
-		"minecraft": "~1.21.1",
-		"java": ">=21",
+		"fabricloader": ">=0.14.23",
+		"minecraft": "~1.20.1",
+		"java": ">=17",
 		"fabric-api": "*"
 	},
 	"suggests": {

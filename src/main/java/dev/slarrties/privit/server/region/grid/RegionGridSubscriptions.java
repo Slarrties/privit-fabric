@@ -1,12 +1,12 @@
 package dev.slarrties.privit.server.region.grid;
 
+import dev.slarrties.privit.server.network.ServerPacketSender;
 import dev.slarrties.privit.common.region.Color;
 import dev.slarrties.privit.common.network.payload.s2c.RegionGridStateS2CPacket;
 import dev.slarrties.privit.server.region.Region;
 
 import net.minecraft.util.math.BlockBox;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 import java.util.Set;
 import java.util.Map;
@@ -67,7 +67,7 @@ public final class RegionGridSubscriptions {
 
         for (ServerPlayerEntity player : players) {
             if (ids.contains(player.getUuid())) {
-                ServerPlayNetworking.send(player, packet);
+                ServerPacketSender.send(player, packet);
             }
         }
     }
@@ -79,7 +79,7 @@ public final class RegionGridSubscriptions {
         RegionGridStateS2CPacket packet = RegionGridStateS2CPacket.hide(regionId);
         for (ServerPlayerEntity player : players) {
             if (ids.contains(player.getUuid())) {
-                ServerPlayNetworking.send(player, packet);
+                ServerPacketSender.send(player, packet);
             }
         }
     }

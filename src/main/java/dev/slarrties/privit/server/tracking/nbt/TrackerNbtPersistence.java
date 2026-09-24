@@ -5,7 +5,6 @@ import dev.slarrties.privit.server.tracking.protection.TrackerManager;
 
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtSizeTracker;
 import net.minecraft.util.WorldSavePath;
 import net.minecraft.server.world.ServerWorld;
 
@@ -37,7 +36,7 @@ public final class TrackerNbtPersistence {
         }
 
         try (var input = Files.newInputStream(filePath)) {
-            NbtCompound root = NbtIo.readCompressed(input, NbtSizeTracker.ofUnlimitedBytes());
+            NbtCompound root = NbtIo.readCompressed(input);
 
             if (root.contains("trackers", net.minecraft.nbt.NbtElement.COMPOUND_TYPE)) {
                 trackerManager.loadFromNbt(root.getCompound("trackers"));

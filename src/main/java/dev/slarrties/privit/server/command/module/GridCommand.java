@@ -4,6 +4,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 
+import dev.slarrties.privit.server.network.ServerPacketSender;
 import dev.slarrties.privit.common.network.payload.s2c.RegionGridClearS2CPacket;
 import dev.slarrties.privit.common.network.payload.s2c.RegionGridStateS2CPacket;
 import dev.slarrties.privit.server.region.Region;
@@ -23,7 +24,6 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.command.argument.UuidArgumentType;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 import java.util.List;
 import java.util.UUID;
@@ -54,7 +54,7 @@ public final class GridCommand implements CommandModule, PlayerAccess, OperatorA
             WorldRegistry.get(world).getGridSubscriptions().onPlayerLeave(player.getUuid());
         }
 
-        ServerPlayNetworking.send(player, new RegionGridClearS2CPacket());
+        ServerPacketSender.send(player, new RegionGridClearS2CPacket());
         return CommandFeedback.success(
                 ctx.getSource(),
                 Text.translatable("privit.command.grid.cleared")
@@ -111,10 +111,10 @@ public final class GridCommand implements CommandModule, PlayerAccess, OperatorA
                         List.of()
                 );
             }
-            ServerPlayNetworking.send(player, packet);
+            ServerPacketSender.send(player, packet);
         } else {
             grids.unsubscribe(regionId, player);
-            ServerPlayNetworking.send(player, RegionGridStateS2CPacket.hide(regionId));
+            ServerPacketSender.send(player, RegionGridStateS2CPacket.hide(regionId));
         }
 
         return CommandFeedback.success(

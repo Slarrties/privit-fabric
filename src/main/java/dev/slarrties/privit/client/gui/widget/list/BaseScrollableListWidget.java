@@ -92,7 +92,9 @@ public abstract class BaseScrollableListWidget<T> extends ClickableWidget implem
     // -------------------------------------------------------------------------
 
     @Override
-    protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        if (!this.visible) return;
+
         context.enableScissor(getX(), getY(), getX() + width, getY() + height);
 
         int contentX = getX() + getContentLeftOffset();
@@ -215,7 +217,7 @@ public abstract class BaseScrollableListWidget<T> extends ClickableWidget implem
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double vertical) {
         if (this.isMouseOver(mouseX, mouseY)) {
             scrollAmount = MathHelper.clamp(scrollAmount - vertical * itemHeight / 2, 0, getMaxScroll());
             return true;

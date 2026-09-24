@@ -9,6 +9,7 @@ import net.minecraft.block.Blocks;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.RespawnAnchorBlock;
 import net.minecraft.entity.Entity;
+import net.minecraft.util.Hand;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.BlockPos;
@@ -46,14 +47,8 @@ public abstract class RespawnAnchorExplosionMixin {
                     target = "Lnet/minecraft/block/RespawnAnchorBlock;explode(Lnet/minecraft/block/BlockState;Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;)V"
             )
     )
-    private void rememberAnchorUser(
-            BlockState state,
-            World world,
-            BlockPos pos,
-            PlayerEntity player,
-            BlockHitResult hit,
-            CallbackInfoReturnable<ActionResult> cir
-    ) {
+    private void rememberAnchorUser(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand,
+                                    BlockHitResult hit, CallbackInfoReturnable<ActionResult> cir) {
         if (player instanceof ServerPlayerEntity serverPlayer) {
             LAST_ANCHOR_USER.set(serverPlayer.getUuid());
         }

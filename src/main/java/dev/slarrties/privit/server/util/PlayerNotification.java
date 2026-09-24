@@ -3,9 +3,9 @@ package dev.slarrties.privit.server.util;
 import dev.slarrties.privit.common.region.Color;
 import dev.slarrties.privit.common.notification.NotificationType;
 import dev.slarrties.privit.common.network.payload.s2c.HudNotificationS2CPacket;
+import dev.slarrties.privit.server.network.ServerPacketSender;
 
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -40,7 +40,7 @@ public final class PlayerNotification {
         }
 
         playerMap.put(type, now);
-        ServerPlayNetworking.send(player, new HudNotificationS2CPacket(type, color));
+        ServerPacketSender.send(player, new HudNotificationS2CPacket(type, color));
         return true;
     }
 

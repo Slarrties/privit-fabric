@@ -83,9 +83,10 @@ public class PlayerSearchList extends BaseScrollableListWidget<PlayerIdentity> {
     }
 
     @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {
-        // Можно добавить позже
-    }
+    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {}
+
+    @Override
+    protected void appendClickableNarrations(NarrationMessageBuilder builder) {}
 
     // =====================================================================
     //
@@ -126,9 +127,7 @@ public class PlayerSearchList extends BaseScrollableListWidget<PlayerIdentity> {
         }
 
         @Override
-        public void setFocused(boolean focused) {
-            // не используется
-        }
+        public void setFocused(boolean focused) {}
 
         @Override
         public boolean isFocused() {

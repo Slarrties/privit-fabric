@@ -4,33 +4,38 @@ import dev.slarrties.privit.common.region.rule.Rule;
 import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 
-import net.minecraft.item.ItemStack;
+import net.minecraft.util.ActionResult;
+import net.minecraft.item.MinecartItem;
+import net.minecraft.item.ItemUsageContext;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.vehicle.TntMinecartEntity;
 import net.minecraft.entity.vehicle.AbstractMinecartEntity;
-import net.minecraft.server.world.ServerWorld;
 
+import com.llamalad7.mixinextras.sugar.Local;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @AssociatedRule(Rule.INTERACT_WITH_MINECARTS)
-@Mixin(AbstractMinecartEntity.class)
+@Mixin(MinecartItem.class)
 public abstract class MinecartCreationMixin {
 
     @Inject(
-            method = "create(Lnet/minecraft/server/world/ServerWorld;DDDLnet/minecraft/entity/vehicle/AbstractMinecartEntity$Type;Lnet/minecraft/item/ItemStack;Lnet/minecraft/entity/player/PlayerEntity;)Lnet/minecraft/entity/vehicle/AbstractMinecartEntity;",
-            at = @At("RETURN")
+            method = "useOnBlock",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;spawnEntity(Lnet/minecraft/entity/Entity;)Z")
     )
-    private static void onMinecartCreated(
-            ServerWorld world, double x, double y, double z,
-            AbstractMinecartEntity.Type type, ItemStack stack,
-            PlayerEntity player, CallbackInfoReturnable<AbstractMinecartEntity> cir) {
+    private void onMinecartSpawned(
+            ItemUsageContext context,
+            CallbackInfoReturnable<ActionResult> cir,
+            @Local AbstractMinecartEntity entity
+    ) {
+        if (!(context.getWorld() instanceof ServerWorld serverWorld)) return;
 
-        AbstractMinecartEntity minecart = cir.getReturnValue();
-        if (minecart == null || player == null) return;
-        if (minecart instanceof TntMinecartEntity && minecart.getWorld() instanceof ServerWorld serverWorld) {
+        PlayerEntity player = context.getPlayer();
+        if (player == null) return;
+        if (entity instanceof TntMinecartEntity minecart) {
             WorldRegistry.get(serverWorld)
                     .getTrackerManager()
                     .getExplosionOriginTracker()

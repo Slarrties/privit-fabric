@@ -4,10 +4,12 @@ import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.client.hud.NotificationHudOverlay;
 import dev.slarrties.privit.client.gui.RegionGuiController;
 import dev.slarrties.privit.client.gui.widget.GuiButton;
+import dev.slarrties.privit.client.gui.widget.ButtonTextures;
 import dev.slarrties.privit.client.gui.widget.ConfirmPanelWidget;
 import dev.slarrties.privit.client.gui.screen.tab.ITabPanel;
 import dev.slarrties.privit.client.gui.screen.tab.RegionGroupsTab;
 import dev.slarrties.privit.client.gui.screen.tab.RegionPropertiesTab;
+import dev.slarrties.privit.client.network.ClientPacketSender;
 import dev.slarrties.privit.common.region.Color;
 import dev.slarrties.privit.common.region.gui.state.RegionGuiState;
 import dev.slarrties.privit.common.notification.NotificationType;
@@ -18,12 +20,9 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ButtonTextures;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.gui.widget.ClickableWidget;
 
-import java.util.Map;
-import java.util.UUID;
-import java.util.HashMap;
+import java.util.*;
 
 public class RegionScreen extends Screen {
 
@@ -96,6 +95,7 @@ public class RegionScreen extends Screen {
         addDrawableChild(confirmPanel);
 
         initTabButtons(backgroundX, backgroundY);
+        syncTabWidgetsToScreen();
         updateTabButtonVisuals();
         updateConfirmPanelVisibility();
     }
@@ -126,11 +126,31 @@ public class RegionScreen extends Screen {
     private void setCurrentTab(Tab newTab) {
         if (currentTab == newTab) return;
         currentTab = newTab;
-
         tabs.forEach((tabType, tab) -> tab.setVisible(tabType == currentTab));
 
+        syncTabWidgetsToScreen();
         updateTabButtonVisuals();
         updateConfirmPanelVisibility();
+    }
+
+    private void syncTabWidgetsToScreen() {
+        List<ClickableWidget> allTabWidgets = new ArrayList<>();
+
+        for (ITabPanel tab : tabs.values()) {
+            allTabWidgets.addAll(tab.getWidgets());
+        }
+
+        this.clearChildren();
+        this.addDrawableChild(tabPropertiesButton);
+        this.addDrawableChild(tabGroupsButton);
+        this.addDrawableChild(confirmPanel);
+
+        ITabPanel activeTab = tabs.get(currentTab);
+        if (activeTab != null) {
+            for (ClickableWidget w : activeTab.getWidgets()) {
+                this.addDrawableChild(w);
+            }
+        }
     }
 
     private void updateTabButtonVisuals() {
@@ -153,19 +173,19 @@ public class RegionScreen extends Screen {
 
     private void acceptChanges() {
         RegionGuiState stateToSend = this.controller.getLocalState().toRegionScreenState();
-        ClientPlayNetworking.send(new RegionUpdateC2SPacket(stateToSend));
+        ClientPacketSender.send(new RegionUpdateC2SPacket(stateToSend));
     }
 
     private void cancelChanges() {
         UUID regionId = this.controller.getLocalState().id();
-        ClientPlayNetworking.send(new RegionGuiCancelC2SPacket(regionId));
+        ClientPacketSender.send(new RegionGuiCancelC2SPacket(regionId));
     }
 
     public RegionGuiController getController() { return controller; }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
+        renderBackground(context);
 
         ITabPanel activeTab = tabs.get(currentTab);
 
@@ -181,7 +201,7 @@ public class RegionScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void renderBackground(DrawContext context) {
         int x = (width - BG_WIDTH) / 2;
         int y = (height - BG_HEIGHT) / 2;
 
@@ -204,14 +224,14 @@ public class RegionScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double verticalAmount) {
         ITabPanel activeTab = tabs.get(currentTab);
 
-        if (activeTab != null && activeTab.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)) {
+        if (activeTab != null && activeTab.mouseScrolled(mouseX, mouseY, verticalAmount)) {
             return true;
         }
 
-        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+        return super.mouseScrolled(mouseX, mouseY, verticalAmount);
     }
 
     @Override

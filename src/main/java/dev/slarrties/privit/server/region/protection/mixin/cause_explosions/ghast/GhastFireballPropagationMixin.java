@@ -6,7 +6,6 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.tracking.protection.ExplosionOriginTracker;
 
 import net.minecraft.world.World;
-import net.minecraft.util.math.Vec3d;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.mob.GhastEntity;
 import net.minecraft.entity.projectile.FireballEntity;
@@ -24,10 +23,11 @@ import java.util.UUID;
 public abstract class GhastFireballPropagationMixin {
 
     @Inject(
-            method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/util/math/Vec3d;I)V",
+            method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/entity/LivingEntity;DDDI)V",
             at = @At("TAIL")
     )
-    private void propagateResponsibleFromGhast(World world, LivingEntity owner, Vec3d velocity, int explosionPower, CallbackInfo ci) {
+    private void propagateResponsibleFromGhast(World world, LivingEntity owner, double velocityX, double velocityY, double velocityZ,
+                                               int explosionPower, CallbackInfo ci) {
         FireballEntity fireball = (FireballEntity) (Object) this;
 
         if (owner instanceof GhastEntity ghast) {

@@ -8,7 +8,6 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
 import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.vehicle.VehicleEntity;
 import net.minecraft.entity.vehicle.AbstractMinecartEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
 
@@ -18,17 +17,15 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @AssociatedRule(Rule.INTERACT_WITH_MINECARTS)
-@Mixin(VehicleEntity.class)
+@Mixin(AbstractMinecartEntity.class)
 public abstract class DamageMinecartMixin {
 
     @Inject(method = "damage", at = @At("HEAD"), cancellable = true)
     private void preventMinecartDamage(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         if (!(source.getAttacker() instanceof ServerPlayerEntity serverPlayer)) return;
 
-        VehicleEntity vehicle = (VehicleEntity) (Object) this;
-        if (!(vehicle instanceof AbstractMinecartEntity)) return;
-
-        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_MINECARTS, vehicle.getBlockPos());
+        AbstractMinecartEntity minecart = (AbstractMinecartEntity) (Object) this;
+        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_MINECARTS, minecart.getBlockPos());
 
         if (!allowed) {
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_MINECART, Color.RED);

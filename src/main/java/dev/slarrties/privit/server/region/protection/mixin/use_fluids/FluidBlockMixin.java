@@ -14,7 +14,6 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldAccess;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.network.ServerPlayerEntity;
 
@@ -48,7 +47,7 @@ public abstract class FluidBlockMixin {
     }
 
     @Inject(method = "tryDrainFluid", at = @At("HEAD"))
-    private void onLiquidDrained(PlayerEntity player, WorldAccess world, BlockPos pos, BlockState state, CallbackInfoReturnable<ItemStack> cir) {
+    private void onLiquidDrained(WorldAccess world, BlockPos pos, BlockState state, CallbackInfoReturnable<ItemStack> cir) {
         if (!(world instanceof ServerWorld serverWorld)) return;
         FluidOriginTracker fluidOriginTracker = WorldRegistry.get(serverWorld)
                 .getTrackerManager()

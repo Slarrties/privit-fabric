@@ -5,7 +5,6 @@ import dev.slarrties.privit.common.region.rule.FrozenRules;
 import dev.slarrties.privit.common.registry.BlocksRegistry;
 import dev.slarrties.privit.common.registry.BlockEntityRegistry;
 import dev.slarrties.privit.common.registry.CreativeTabsRegistry;
-import dev.slarrties.privit.common.registry.PayloadRegistry;
 import dev.slarrties.privit.server.PrivitServer;
 
 import org.slf4j.Logger;
@@ -30,7 +29,6 @@ public class PrivitMod implements ModInitializer {
 		ConfigManager.init();
 		FrozenRules.init();
 		BlocksRegistry.register();
-		PayloadRegistry.register();
 		BlockEntityRegistry.register();
 		CreativeTabsRegistry.register();
 

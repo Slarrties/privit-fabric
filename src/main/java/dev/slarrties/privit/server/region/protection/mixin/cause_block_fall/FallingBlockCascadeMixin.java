@@ -89,7 +89,7 @@ public abstract class FallingBlockCascadeMixin {
     @Unique
     private static boolean isPopoffBlock(BlockState state) {
         Block block = state.getBlock();
-        return block instanceof AbstractTorchBlock
+        return block instanceof TorchBlock
                 || block instanceof WallTorchBlock
                 || block instanceof LanternBlock
                 || block instanceof ButtonBlock

@@ -14,7 +14,6 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.gui.screen.ButtonTextures;
 
 import java.util.List;
 import java.util.Optional;

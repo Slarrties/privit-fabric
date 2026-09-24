@@ -1,12 +1,10 @@
 package dev.slarrties.privit.client.util;
 
-import dev.slarrties.privit.PrivitMod;
+import dev.slarrties.privit.client.network.ClientPacketSender;
 import dev.slarrties.privit.common.util.PlayerIdentity;
 import dev.slarrties.privit.common.util.PlayerNameProvider;
 import dev.slarrties.privit.common.region.RegionPlayerGroup;
 import dev.slarrties.privit.common.network.payload.c2s.RequestPlayerNamesC2SPacket;
-
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,7 +50,7 @@ public final class ClientPlayerIdentityCache implements PlayerNameProvider {
 
         if (missing.isEmpty()) return false;
 
-        ClientPlayNetworking.send(new RequestPlayerNamesC2SPacket(missing));
+        ClientPacketSender.send(new RequestPlayerNamesC2SPacket(missing));
         return true;
     }
 

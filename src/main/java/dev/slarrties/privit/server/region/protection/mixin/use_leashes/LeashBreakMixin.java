@@ -8,7 +8,7 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.PlayerPermissionCache;
 
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.Leashable;
+import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
 
 import org.spongepowered.asm.mixin.Mixin;
@@ -34,7 +34,7 @@ public abstract class LeashBreakMixin {
 
         boolean hasAnyLeash = false;
         for (Entity entity : serverPlayer.getWorld().getOtherEntities(serverPlayer, serverPlayer.getBoundingBox().expand(20))) {
-            if (entity instanceof Leashable leashable && leashable.getLeashHolder() == serverPlayer) {
+            if (entity instanceof MobEntity mob && mob.getHoldingEntity() == serverPlayer) {
                 hasAnyLeash = true;
                 break;
             }
@@ -45,9 +45,9 @@ public abstract class LeashBreakMixin {
         if (allowed) return;
 
         for (Entity entity : serverPlayer.getWorld().getOtherEntities(serverPlayer, serverPlayer.getBoundingBox().expand(20))) {
-            if (entity instanceof Leashable leashable && leashable.getLeashHolder() == serverPlayer) {
+            if (entity instanceof MobEntity mob && mob.getHoldingEntity() == serverPlayer) {
                 PlayerNotification.trySend(serverPlayer, NotificationType.DENY_USE_LEASH, Color.RED);
-                leashable.detachLeash(true, true);
+                mob.detachLeash(true, true);
             }
         }
     }

@@ -19,7 +19,6 @@ import java.util.UUID;
 
 @Mixin({
         RepeaterBlock.class,
-        ComparatorBlock.class,
         ObserverBlock.class
 })
 public abstract class RedstoneNeighborUpdateMixin {

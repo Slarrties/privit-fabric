@@ -63,9 +63,9 @@ public abstract class BoneMealItemMixin {
 
         UUID uuid = ctx.getResponsible();
         if (RegionPermissionChecker.isAllowed(uuid, Rule.USE_BONE_MEAL, pos, serverWorld)) return;
-        if (serverWorld.getServer().getPlayerManager().getPlayer(uuid) instanceof ServerPlayerEntity player) {
-            PlayerNotification.trySend(player, NotificationType.DENY_USE_BONE_MEAL, Color.RED);
-        }
+
+        ServerPlayerEntity player = serverWorld.getServer().getPlayerManager().getPlayer(uuid);
+        if (player != null) PlayerNotification.trySend(player, NotificationType.DENY_USE_BONE_MEAL, Color.RED);
 
         cir.setReturnValue(false);
     }

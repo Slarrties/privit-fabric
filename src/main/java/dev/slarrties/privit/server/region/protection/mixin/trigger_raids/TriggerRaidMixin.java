@@ -31,26 +31,26 @@ import java.util.List;
 public abstract class TriggerRaidMixin {
 
     @Inject(method = "startRaid", at = @At("HEAD"), cancellable = true)
-    private void preventRaidTrigger(ServerPlayerEntity player, BlockPos pos, CallbackInfoReturnable<Raid> cir) {
+    private void preventRaidTrigger(ServerPlayerEntity player, CallbackInfoReturnable<Raid> cir) {
         if (!RegionPermissionChecker.isAllowed(player, Rule.TRIGGER_RAIDS, player.getBlockPos())) {
             denyRaid(player, cir);
             return;
         }
 
-        BlockPos villageCenter = calculateVillageCenter(player.getServerWorld(), pos);
-        if (villageCenter != null && !RegionPermissionChecker.isAllowed(player, Rule.TRIGGER_RAIDS, villageCenter))
+        BlockPos villageCenter = calculateVillageCenter(player.getServerWorld(), player.getBlockPos());
+        if (villageCenter != null && !RegionPermissionChecker.isAllowed(player, Rule.TRIGGER_RAIDS, villageCenter)) {
             denyRaid(player, cir);
+        }
     }
 
     @Inject(method = "startRaid", at = @At("RETURN"))
-    private void recordRaidOrigin(ServerPlayerEntity player, BlockPos pos, CallbackInfoReturnable<Raid> cir) {
+    private void recordRaidOrigin(ServerPlayerEntity player, CallbackInfoReturnable<Raid> cir) {
         Raid raid = cir.getReturnValue();
 
         if (raid != null) {
             RaidOriginTracker raidTracker = WorldRegistry.get(player.getServerWorld())
                     .getTrackerManager()
                     .getRaidOriginTracker();
-
             if (raidTracker.getResponsible(raid.getRaidId()) == null) {
                 raidTracker.record(raid.getRaidId(), player.getUuid());
             }
@@ -82,7 +82,6 @@ public abstract class TriggerRaidMixin {
             y += p.getY();
             z += p.getZ();
         }
-
         int count = pois.size();
         return new BlockPos((int)(x / count), (int)(y / count), (int)(z / count));
     }

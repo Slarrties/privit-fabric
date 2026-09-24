@@ -1,6 +1,7 @@
 package dev.slarrties.privit.client.gui.screen;
 
 import dev.slarrties.privit.PrivitMod;
+import dev.slarrties.privit.client.gui.widget.ButtonTextures;
 import dev.slarrties.privit.client.gui.widget.GuiButton;
 import dev.slarrties.privit.client.gui.RegionGuiController;
 import dev.slarrties.privit.common.region.Color;
@@ -11,7 +12,6 @@ import net.minecraft.util.Identifier;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ButtonTextures;
 
 import java.util.Optional;
 
@@ -111,14 +111,14 @@ public class RegionColorScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
+        renderBackground(context);
         context.drawCenteredTextWithShadow(textRenderer, Text.translatable("privit.gui.color.text.title"), width / 2, 55, 0xFFFFFF);
 
         super.render(context, mouseX, mouseY, delta);
     }
 
     @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void renderBackground(DrawContext context) {
         int x = (width - 210) / 2;
         int y = (height - 180) / 2;
 

@@ -12,7 +12,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.screen.ButtonTextures;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -25,9 +24,9 @@ public class GuiButton extends ButtonWidget {
     }
 
     private static final ButtonTextures VANILLA_TEXTURES = new ButtonTextures(
-            Identifier.ofVanilla("widget/button"),
-            Identifier.ofVanilla("widget/button_disabled"),
-            Identifier.ofVanilla("widget/button_highlighted")
+            new Identifier("widget/button"),
+            new Identifier("widget/button_disabled"),
+            new Identifier("widget/button_highlighted")
     );
 
     public static final NarrationSupplier DEFAULT_NARRATION_SUPPLIER =
@@ -57,7 +56,7 @@ public class GuiButton extends ButtonWidget {
     }
 
     @Override
-    protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {
         MinecraftClient client = MinecraftClient.getInstance();
         boolean hasText = !this.getMessage().getString().isBlank();
 
@@ -68,7 +67,7 @@ public class GuiButton extends ButtonWidget {
                 if (!this.active) {
                     textureId = backgroundTextures.disabled();
                 } else if (this.isHovered() || this.isSelected()) {
-                    textureId = backgroundTextures.enabledFocused();
+                    textureId = backgroundTextures.hovered();
                 } else {
                     textureId = backgroundTextures.enabled();
                 }
@@ -81,12 +80,11 @@ public class GuiButton extends ButtonWidget {
                         this.getWidth(), this.getHeight()
                 );
             } else {
+                // UV-coords for widgets.png: 46 (disabled), 66 (enabled), 86 (hovered)
+                int v = !this.active ? 46 : (this.isHovered() ? 86 : 66);
                 textureId = VANILLA_TEXTURES.get(this.active, this.isSelected());
-                context.drawGuiTexture(
-                        textureId,
-                        this.getX(), this.getY(),
-                        this.getWidth(), this.getHeight()
-                );
+                context.drawTexture(WIDGETS_TEXTURE, this.getX(), this.getY(), 0, v, this.getWidth() / 2, this.getHeight());
+                context.drawTexture(WIDGETS_TEXTURE, this.getX() + this.getWidth() / 2, this.getY(), 200 - this.getWidth() / 2, v, this.getWidth() / 2, this.getHeight());
             }
         }
 

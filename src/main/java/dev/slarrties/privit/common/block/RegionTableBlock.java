@@ -1,9 +1,12 @@
 package dev.slarrties.privit.common.block;
 
+import dev.slarrties.privit.client.network.ClientPacketSender;
 import dev.slarrties.privit.common.network.payload.c2s.RegionGuiRequestC2SPacket;
 import dev.slarrties.privit.common.network.payload.s2c.RegionGridStateS2CPacket;
 import dev.slarrties.privit.server.world.WorldRegistry;
+import dev.slarrties.privit.server.network.ServerPacketSender;
 
+import net.minecraft.util.Hand;
 import net.minecraft.world.World;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -19,9 +22,6 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import com.mojang.serialization.MapCodec;
 
 import java.util.UUID;
 
@@ -30,11 +30,6 @@ public class RegionTableBlock extends HorizontalFacingBlock {
     public RegionTableBlock(Settings settings) {
         super(settings);
         setDefaultState(getDefaultState().with(FACING, Direction.NORTH));
-    }
-
-    @Override
-    protected MapCodec<? extends HorizontalFacingBlock> getCodec() {
-        return null;
     }
 
     @Override
@@ -58,9 +53,9 @@ public class RegionTableBlock extends HorizontalFacingBlock {
     }
 
     @Override
-    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
+    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
         if (world.isClient) {
-            ClientPlayNetworking.send(new RegionGuiRequestC2SPacket(pos));
+            ClientPacketSender.send(new RegionGuiRequestC2SPacket(pos));
             return ActionResult.SUCCESS;
         }
 
@@ -78,7 +73,7 @@ public class RegionTableBlock extends HorizontalFacingBlock {
                 RegionGridStateS2CPacket packet = RegionGridStateS2CPacket.hide(regionId);
 
                 for (PlayerEntity player : world.getPlayers()) {
-                    ServerPlayNetworking.send((ServerPlayerEntity) player, packet);
+                    ServerPacketSender.send((ServerPlayerEntity) player, packet);
                 }
             }
         }

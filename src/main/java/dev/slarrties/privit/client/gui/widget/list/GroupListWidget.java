@@ -1,6 +1,5 @@
 package dev.slarrties.privit.client.gui.widget.list;
 
-import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.client.util.FormattedTooltipText;
 import dev.slarrties.privit.common.region.RegionPlayerGroup;
 
@@ -92,9 +91,9 @@ public class GroupListWidget extends BaseScrollableListWidget<RegionPlayerGroup>
     protected void appendClickableNarrations(NarrationMessageBuilder builder) {}
 
     @Override
-    protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         clearPendingTooltip();
-        super.renderWidget(context, mouseX, mouseY, delta);
+        super.render(context, mouseX, mouseY, delta);
 
         if (!isMouseOver(mouseX, mouseY)) return;
 
@@ -116,6 +115,9 @@ public class GroupListWidget extends BaseScrollableListWidget<RegionPlayerGroup>
             break;
         }
     }
+
+    @Override
+    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {}
 
     public static class GroupEntry extends Entry<RegionPlayerGroup> {
 

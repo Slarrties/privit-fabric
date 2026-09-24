@@ -10,6 +10,7 @@ import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 
 import net.minecraft.world.World;
+import net.minecraft.util.Hand;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.hit.BlockHitResult;
@@ -45,20 +46,19 @@ public abstract class ButtonPressMixin {
     @Shadow @Final private BlockSetType blockSetType;
 
     @Inject(method = "onUse", at = @At("HEAD"), cancellable = true)
-    private void preventButtonPress(BlockState state, World world, BlockPos pos, PlayerEntity player,
-                                    BlockHitResult hit, CallbackInfoReturnable<ActionResult> cir) {
+    private void preventButtonPress(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit,
+                                    CallbackInfoReturnable<ActionResult> cir) {
         if (!(player instanceof ServerPlayerEntity serverPlayer)) return;
         if (RegionPermissionChecker.isAllowed(serverPlayer, Rule.PRESS_BUTTONS, pos)) return;
 
-        cir.setReturnValue(ActionResult.FAIL);
-        serverPlayer.networkHandler.sendPacket(new BlockUpdateS2CPacket(pos, state));
         PlayerNotification.trySend(serverPlayer, NotificationType.DENY_PRESS_BUTTON, Color.RED);
+        serverPlayer.networkHandler.sendPacket(new BlockUpdateS2CPacket(pos, state));
+        cir.setReturnValue(ActionResult.FAIL);
     }
 
     @Inject(method = "tryPowerWithProjectiles", at = @At("HEAD"), cancellable = true)
     private void preventUnauthorizedProjectileActivation(BlockState state, World world, BlockPos pos, CallbackInfo ci) {
         if (world.isClient || (Boolean) state.get(ButtonBlock.POWERED)) return;
-        if (!this.blockSetType.canButtonBeActivatedByArrows()) return;
 
         // TODO: if there is already a projectile in the button area, the new one will not be added.
         PersistentProjectileEntity projectile = world.getNonSpectatingEntities(

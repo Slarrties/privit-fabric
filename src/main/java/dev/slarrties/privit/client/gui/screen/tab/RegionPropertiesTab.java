@@ -3,10 +3,12 @@ package dev.slarrties.privit.client.gui.screen.tab;
 import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.client.gui.RegionGuiController;
 import dev.slarrties.privit.client.gui.widget.GuiButton;
+import dev.slarrties.privit.client.gui.widget.ButtonTextures;
 import dev.slarrties.privit.client.gui.widget.CustomTextField;
 import dev.slarrties.privit.client.gui.widget.RegionAreaWidget;
 import dev.slarrties.privit.client.gui.screen.RegionColorScreen;
 import dev.slarrties.privit.client.render.RegionRenderManager;
+import dev.slarrties.privit.client.network.ClientPacketSender;
 import dev.slarrties.privit.common.network.payload.c2s.RegionCreateC2SPacket;
 import dev.slarrties.privit.common.network.payload.c2s.RegionDeleteC2SPacket;
 import dev.slarrties.privit.common.network.payload.c2s.RegionGridStateC2SPacket;
@@ -19,8 +21,6 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.screen.ButtonTextures;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 
 import java.util.List;
 import java.util.Optional;
@@ -140,7 +140,7 @@ public class RegionPropertiesTab implements ITabPanel {
             boolean newVisible = !current;
 
             RegionRenderManager.setGridVisible(regionId, newVisible);
-            ClientPlayNetworking.send(new RegionGridStateC2SPacket(regionId, newVisible));
+            ClientPacketSender.send(new RegionGridStateC2SPacket(regionId, newVisible));
             updateGridButton();
         })
                 .dimensions(buttonX, mainPanelY, BUTTON_SIZE, BUTTON_SIZE)
@@ -157,10 +157,10 @@ public class RegionPropertiesTab implements ITabPanel {
             UUID regionId = this.controller.getLocalState().id();
 
             if (!this.controller.getLocalState().isCreated()) {
-                ClientPlayNetworking.send(new RegionCreateC2SPacket(this.controller.getLocalState().toRegionScreenState()));
+                ClientPacketSender.send(new RegionCreateC2SPacket(this.controller.getLocalState().toRegionScreenState()));
             } else {
-                ClientPlayNetworking.send(new RegionDeleteC2SPacket(regionId));
-                ClientPlayNetworking.send(new RegionGridStateC2SPacket(regionId, false));
+                ClientPacketSender.send(new RegionDeleteC2SPacket(regionId));
+                ClientPacketSender.send(new RegionGridStateC2SPacket(regionId, false));
                 RegionRenderManager.disableAndRemove(regionId);
             }
 
@@ -190,7 +190,7 @@ public class RegionPropertiesTab implements ITabPanel {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double verticalAmount) {
         return false;
     }
 

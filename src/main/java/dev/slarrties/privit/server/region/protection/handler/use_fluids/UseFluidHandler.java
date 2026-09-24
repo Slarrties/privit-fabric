@@ -76,18 +76,12 @@ public final class UseFluidHandler implements RuleEventHandler {
             ItemStack stack = player.getStackInHand(hand);
             if (!isLiquidBucket(stack)) return TypedActionResult.pass(stack);
 
-            double reach = serverPlayer.getBlockInteractionRange();
+            double reach = serverPlayer.isCreative() ? 5.0D : 4.5D;
             Vec3d start = serverPlayer.getEyePos();
-            Vec3d direction = serverPlayer.getRotationVec(1.0F);
-            Vec3d end = start.add(direction.multiply(reach));
+            Vec3d end = start.add(serverPlayer.getRotationVec(1.0F).multiply(reach));
+
             BlockHitResult hitResult = world.raycast(
-                    new RaycastContext(
-                            start,
-                            end,
-                            RaycastContext.ShapeType.OUTLINE,
-                            RaycastContext.FluidHandling.ANY,
-                            serverPlayer
-                    )
+                    new RaycastContext(start, end, RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, serverPlayer)
             );
             BlockPos placePos;
 

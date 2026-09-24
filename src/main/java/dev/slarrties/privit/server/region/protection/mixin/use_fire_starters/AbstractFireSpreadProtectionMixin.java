@@ -34,7 +34,7 @@ public abstract class AbstractFireSpreadProtectionMixin {
     }
 
     @Inject(method = "onBreak", at = @At("HEAD"))
-    private void onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player, CallbackInfoReturnable<BlockState> cir) {
+    private void onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player, CallbackInfo ci) {
         if(world instanceof ServerWorld serverWorld) {
             this.removeFromTracker(serverWorld, pos);
         }

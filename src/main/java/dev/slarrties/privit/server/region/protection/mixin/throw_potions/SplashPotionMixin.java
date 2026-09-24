@@ -12,7 +12,9 @@ import dev.slarrties.privit.server.tracking.protection.CampfireOriginTracker;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.CampfireBlock;
 import net.minecraft.item.Items;
+import net.minecraft.potion.Potion;
 import net.minecraft.potion.Potions;
+import net.minecraft.potion.PotionUtil;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.BlockPos;
@@ -21,13 +23,15 @@ import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.projectile.thrown.PotionEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.component.type.PotionContentsComponent;
+import net.minecraft.item.ItemStack;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import java.util.List;
 
 @AssociatedRule({Rule.THROW_POTIONS, Rule.EXTINGUISH_FIRE})
 @Mixin(PotionEntity.class)
@@ -37,14 +41,13 @@ public abstract class SplashPotionMixin {
     private static final int POTION_EFFECT_RADIUS_CHECK = 4;
 
     @Inject(method = "applySplashPotion", at = @At("HEAD"), cancellable = true)
-    private void cancelSplashInProtectedRegion(Iterable<StatusEffectInstance> effects, Entity entity, CallbackInfo ci) {
+    private void cancelSplashInProtectedRegion(List<StatusEffectInstance> effects, Entity entity, CallbackInfo ci) {
         PotionEntity potion = (PotionEntity) (Object) this;
         Entity owner = potion.getOwner();
         if (!(owner instanceof ServerPlayerEntity thrower)) return;
 
         Vec3d impactPos = potion.getPos();
         boolean allowed = isPotionAreaSafe(thrower, impactPos);
-
         if (!allowed) {
             ci.cancel();
             sendDenyNotification(thrower);
@@ -52,14 +55,13 @@ public abstract class SplashPotionMixin {
     }
 
     @Inject(method = "applyLingeringPotion", at = @At("HEAD"), cancellable = true)
-    private void cancelLingeringPotionInProtectedRegion(PotionContentsComponent potionContents, CallbackInfo ci) {
-        PotionEntity potion = (PotionEntity) (Object) this;
-        Entity owner = potion.getOwner();
+    private void cancelLingeringPotionInProtectedRegion(ItemStack stack, Potion potion, CallbackInfo ci) {
+        PotionEntity potion2 = (PotionEntity) (Object) this;
+        Entity owner = potion2.getOwner();
         if (!(owner instanceof ServerPlayerEntity thrower)) return;
 
-        Vec3d impactPos = potion.getPos();
+        Vec3d impactPos = potion2.getPos();
         boolean allowed = isPotionAreaSafe(thrower, impactPos);
-
         if (!allowed) {
             sendDenyNotification(thrower);
             ci.cancel();
@@ -114,18 +116,18 @@ public abstract class SplashPotionMixin {
     private boolean isWaterBottle(PotionEntity potion) {
         var stack = potion.getStack();
         if (!stack.isOf(Items.SPLASH_POTION) && !stack.isOf(Items.LINGERING_POTION)) return false;
-        var contents = stack.getOrDefault(net.minecraft.component.DataComponentTypes.POTION_CONTENTS, PotionContentsComponent.DEFAULT);
-
-        return contents.potion().orElse(null) == Potions.WATER;
+        return PotionUtil.getPotion(stack) == Potions.WATER;
     }
 
     @Unique
     private static boolean isPotionAreaSafe(ServerPlayerEntity thrower, Vec3d center) {
         final int r = POTION_EFFECT_RADIUS_CHECK;
+        BlockPos centerPos = BlockPos.ofFloored(center);
+
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
                 if (Math.abs(dx) + Math.abs(dz) > r + 1) continue;
-                BlockPos checkPos = BlockPos.ofFloored(center.x + dx, center.y, center.z + dz);
+                BlockPos checkPos = centerPos.add(dx, 0, dz);
                 if (!RegionPermissionChecker.isAllowed(thrower, Rule.THROW_POTIONS, checkPos)) {
                     return false;
                 }
@@ -135,12 +137,12 @@ public abstract class SplashPotionMixin {
     }
 
     @Unique
-    private void sendExtinguishDenyNotification(ServerPlayerEntity serverPlayer) {
-        PlayerNotification.trySend(serverPlayer, NotificationType.DENY_EXTINGUISH_FIRE, Color.RED);
+    private void sendDenyNotification(ServerPlayerEntity player) {
+        PlayerNotification.trySend(player, NotificationType.DENY_THROW_POTION, Color.RED);
     }
 
     @Unique
-    private void sendDenyNotification(ServerPlayerEntity serverPlayer) {
-        PlayerNotification.trySend(serverPlayer, NotificationType.DENY_THROW_POTION, Color.RED);
+    private void sendExtinguishDenyNotification(ServerPlayerEntity player) {
+        PlayerNotification.trySend(player, NotificationType.DENY_EXTINGUISH_FIRE, Color.RED);
     }
 }

@@ -8,6 +8,7 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.redstone.handler.RedstoneReceiverHandler;
 
+import net.minecraft.util.Hand;
 import net.minecraft.world.World;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -33,8 +34,8 @@ import java.util.UUID;
 public abstract class InteractTrapdoorMixin {
 
     @Inject(method = "onUse", at = @At("HEAD"), cancellable = true)
-    private void preventTrapdoorUse(BlockState state, World world, BlockPos pos,
-                                    PlayerEntity player, BlockHitResult hit, CallbackInfoReturnable<ActionResult> cir) {
+    private void preventTrapdoorUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand,
+                                    BlockHitResult hit, CallbackInfoReturnable<ActionResult> cir) {
         if (!(player instanceof ServerPlayerEntity serverPlayer)) return;
         if (RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_TRAPDOORS, pos)) return;
 

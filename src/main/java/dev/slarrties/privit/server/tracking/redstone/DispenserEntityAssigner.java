@@ -111,7 +111,6 @@ public final class DispenserEntityAssigner {
         if (stack.isOf(Items.SNOWBALL)) return EntityType.SNOWBALL;
         if (stack.isOf(Items.EGG)) return EntityType.EGG;
         if (stack.isOf(Items.SPLASH_POTION) || stack.isOf(Items.LINGERING_POTION)) return EntityType.POTION;
-        if (stack.isOf(Items.WIND_CHARGE)) return EntityType.WIND_CHARGE;
         if (stack.getItem() instanceof ArrowItem) return EntityType.ARROW;
 
         return null;
@@ -122,7 +121,6 @@ public final class DispenserEntityAssigner {
         return type == EntityType.SNOWBALL ||
                 type == EntityType.EGG ||
                 type == EntityType.POTION ||
-                type == EntityType.WIND_CHARGE ||
                 type == EntityType.ARROW ||
                 type == EntityType.SPECTRAL_ARROW ||
                 type == EntityType.SMALL_FIREBALL ||

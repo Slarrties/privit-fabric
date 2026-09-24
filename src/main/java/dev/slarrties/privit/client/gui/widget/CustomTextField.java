@@ -25,7 +25,7 @@ public class CustomTextField extends TextFieldWidget {
     }
 
     @Override
-    public void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         if (!this.visible) return;
 
         int fieldX = this.getX();

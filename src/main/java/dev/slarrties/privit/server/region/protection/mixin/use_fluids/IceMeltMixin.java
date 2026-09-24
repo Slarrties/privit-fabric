@@ -148,16 +148,6 @@ public abstract class IceMeltMixin {
     @Unique
     private static boolean isLitLamp(BlockState state) {
         if (state.isOf(Blocks.REDSTONE_LAMP)) return state.contains(Properties.LIT) && state.get(Properties.LIT);
-        if (state.isOf(Blocks.COPPER_BULB)
-                || state.isOf(Blocks.EXPOSED_COPPER_BULB)
-                || state.isOf(Blocks.WEATHERED_COPPER_BULB)
-                || state.isOf(Blocks.OXIDIZED_COPPER_BULB)
-                || state.isOf(Blocks.WAXED_COPPER_BULB)
-                || state.isOf(Blocks.WAXED_EXPOSED_COPPER_BULB)
-                || state.isOf(Blocks.WAXED_WEATHERED_COPPER_BULB)
-                || state.isOf(Blocks.WAXED_OXIDIZED_COPPER_BULB)) {
-            return state.contains(Properties.LIT) && state.get(Properties.LIT);
-        }
 
         return false;
     }

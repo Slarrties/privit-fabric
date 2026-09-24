@@ -99,7 +99,7 @@ public abstract class SpongeAbsorbMixin {
                     Block block = blockState.getBlock();
 
                     if (block instanceof FluidDrainable fluidDrainable) {
-                        if (!fluidDrainable.tryDrainFluid((PlayerEntity) null, world, currentPos, blockState).isEmpty()) {
+                        if (!fluidDrainable.tryDrainFluid(world, currentPos, blockState).isEmpty()) {
                             absorbedAnything.set(true);
                             fluidOriginTracker.remove(currentPos);
                             return true;

@@ -6,7 +6,6 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.registry.RegistryWrapper.WrapperLookup;
 
 import java.util.UUID;
 
@@ -32,16 +31,16 @@ public class RegionTableBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void writeNbt(NbtCompound nbt, WrapperLookup registryLookup) {
-        super.writeNbt(nbt, registryLookup);
+    protected void writeNbt(NbtCompound nbt) {
+        super.writeNbt(nbt);
         if (regionId != null) {
             nbt.putUuid("RegionId", regionId);
         }
     }
 
     @Override
-    public void readNbt(NbtCompound nbt, WrapperLookup registryLookup) {
-        super.readNbt(nbt, registryLookup);
+    public void readNbt(NbtCompound nbt) {
+        super.readNbt(nbt);
         regionId = nbt.containsUuid("RegionId") ? nbt.getUuid("RegionId") : null;
     }
 }

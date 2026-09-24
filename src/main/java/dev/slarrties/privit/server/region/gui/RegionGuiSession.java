@@ -10,13 +10,12 @@ import dev.slarrties.privit.common.network.payload.s2c.RegionGuiUpdateS2CPacket;
 import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.Region;
 import dev.slarrties.privit.server.region.RegionManager;
+import dev.slarrties.privit.server.network.ServerPacketSender;
 
 import net.minecraft.util.math.BlockBox;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 import java.util.Set;
 import java.util.UUID;
@@ -105,12 +104,10 @@ public final class RegionGuiSession {
     }
 
     public BlockBox clamp(BlockBox box, int minY, int maxY) {
-        int y1 = Math.clamp(box.getMinY(), minY, maxY);
-        int y2 = Math.clamp(box.getMaxY(), minY, maxY);
+        int y1 = Math.max(minY, Math.min(box.getMinY(), maxY));
+        int y2 = Math.max(minY, Math.min(box.getMaxY(), maxY));
 
-        if (y1 > y2) {
-            int t = y1; y1 = y2; y2 = t;
-        }
+        if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
 
         return new BlockBox(
                 box.getMinX(), y1, box.getMinZ(),
@@ -231,10 +228,11 @@ public final class RegionGuiSession {
     }
 
     public void sendClose() {
-        CustomPayload close = new RegionGuiCloseS2CPacket(regionId);
-        for (ServerPlayerEntity viewer : Set.copyOf(viewers)) {
-            ServerPlayNetworking.send(viewer, close);
-        }
+        RegionGuiCloseS2CPacket close = new RegionGuiCloseS2CPacket(regionId);
+
+        for (ServerPlayerEntity viewer : Set.copyOf(viewers))
+            ServerPacketSender.send(viewer, close);
+
         viewers.clear();
     }
 
@@ -255,10 +253,9 @@ public final class RegionGuiSession {
         );
     }
 
-    private void broadcast(CustomPayload packet) {
-        for (ServerPlayerEntity viewer : viewers) {
-            ServerPlayNetworking.send(viewer, packet);
-        }
+    private void broadcast(RegionGuiUpdateS2CPacket packet) {
+        for (ServerPlayerEntity viewer : viewers)
+            ServerPacketSender.send(viewer, packet);
     }
 
     private void applyDeltaToState(RegionGuiUpdateC2SPacket delta) {

@@ -49,12 +49,15 @@ public class RuleListWidget extends BaseScrollableListWidget<Rule> {
     protected boolean shouldSelectFirstByDefault() { return false; }
 
     @Override
+    protected void renderButton(DrawContext context, int mouseX, int mouseY, float delta) {}
+
+    @Override
     protected void appendClickableNarrations(NarrationMessageBuilder builder) {}
 
     @Override
-    protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         clearPendingTooltip();
-        super.renderWidget(context, mouseX, mouseY, delta);
+        super.render(context, mouseX, mouseY, delta);
 
         if (!isMouseOver(mouseX, mouseY)) return;
 

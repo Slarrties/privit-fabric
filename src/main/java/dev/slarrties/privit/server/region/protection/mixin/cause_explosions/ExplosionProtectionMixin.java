@@ -19,7 +19,6 @@ import net.minecraft.entity.Ownable;
 import net.minecraft.entity.boss.WitherEntity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.projectile.WitherSkullEntity;
-import net.minecraft.entity.projectile.AbstractWindChargeEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.math.Vec3d;
@@ -39,13 +38,15 @@ import java.util.UUID;
 
 @AssociatedRule({
         Rule.CAUSE_EXPLOSIONS,
-        Rule.THROW_WIND_CHARGES,
         Rule.CAUSE_BLOCK_FALL
 })
 @Mixin(Explosion.class)
 public abstract class ExplosionProtectionMixin {
 
     @Shadow @Final private World world;
+    @Shadow @Final private double x;
+    @Shadow @Final private double y;
+    @Shadow @Final private double z;
 
     @Unique
     private Explosion getExplosion() {
@@ -60,21 +61,16 @@ public abstract class ExplosionProtectionMixin {
             )
     )
     private boolean preventExplosionDamage(Entity entity, DamageSource source, float amount, Operation<Boolean> original) {
-        if (!(this.world instanceof ServerWorld serverWorld)) {
+        if (!(this.world instanceof ServerWorld serverWorld))
             return original.call(entity, source, amount);
-        }
 
         UUID responsible = getResponsiblePlayer(serverWorld);
-        if (responsible == null) {
+        if (responsible == null)
             return original.call(entity, source, amount);
-        }
-
-        Rule rule = getRuleToCheck();
-        if (RegionPermissionChecker.isAllowed(responsible, rule, entity.getBlockPos(), serverWorld)) {
+        if (RegionPermissionChecker.isAllowed(responsible, Rule.CAUSE_EXPLOSIONS, entity.getBlockPos(), serverWorld))
             return original.call(entity, source, amount);
-        }
 
-        sendDenyNotification(responsible, rule, serverWorld);
+        sendDenyNotification(responsible, serverWorld);
         return false;
     }
 
@@ -97,8 +93,7 @@ public abstract class ExplosionProtectionMixin {
             return;
         }
 
-        Rule rule = getRuleToCheck();
-        if (RegionPermissionChecker.isAllowed(responsible, rule, entity.getBlockPos(), serverWorld)) {
+        if (RegionPermissionChecker.isAllowed(responsible, Rule.CAUSE_EXPLOSIONS, entity.getBlockPos(), serverWorld)) {
             original.call(entity, velocity);
         }
     }
@@ -106,14 +101,11 @@ public abstract class ExplosionProtectionMixin {
     @Inject(method = "collectBlocksAndDamageEntities", at = @At("RETURN"))
     private void filterProtectedBlocks(CallbackInfo ci) {
         if (!(this.world instanceof ServerWorld serverWorld)) return;
-
         UUID responsible = getResponsiblePlayer(serverWorld);
+
         if (responsible == null) return;
-
-        Rule rule = getRuleToCheck();
-
         getExplosion().getAffectedBlocks().removeIf(pos ->
-                !RegionPermissionChecker.isAllowed(responsible, rule, pos, serverWorld)
+                !RegionPermissionChecker.isAllowed(responsible, Rule.CAUSE_EXPLOSIONS, pos, serverWorld)
         );
     }
 
@@ -124,7 +116,8 @@ public abstract class ExplosionProtectionMixin {
         UUID responsible = getResponsiblePlayer(serverWorld);
         if (responsible == null) return;
 
-        BlockFallContext.push(responsible, BlockPos.ofFloored(getExplosion().getPosition()));
+        BlockPos centerPos = BlockPos.ofFloored(this.x, this.y, this.z);
+        BlockFallContext.push(responsible, centerPos);
 
         for (BlockPos pos : getExplosion().getAffectedBlocks()) {
             BlockFallOriginTracker blockFallTracker = WorldRegistry.get(serverWorld)
@@ -147,16 +140,15 @@ public abstract class ExplosionProtectionMixin {
         ExplosionOriginTracker tracker = WorldRegistry.get(serverWorld)
                 .getTrackerManager()
                 .getExplosionOriginTracker();
-
         UUID responsible = tracker.getResponsiblePlayer(exploder);
         if (responsible != null) return responsible;
 
-        if (exploder instanceof ServerPlayerEntity player) {
+        if (exploder instanceof ServerPlayerEntity player)
             return player.getUuid();
-        }
 
         if (exploder instanceof WitherSkullEntity skull) {
             Entity owner = skull.getOwner();
+
             if (owner instanceof WitherEntity wither) {
                 responsible = tracker.getResponsiblePlayer(wither);
                 if (responsible != null) return responsible;
@@ -165,35 +157,22 @@ public abstract class ExplosionProtectionMixin {
 
         if (exploder instanceof Ownable ownable) {
             Entity owner = ownable.getOwner();
-            if (owner instanceof ServerPlayerEntity player) {
+
+            if (owner instanceof ServerPlayerEntity player)
                 return player.getUuid();
-            }
             if (owner != null) {
                 responsible = tracker.getResponsiblePlayer(owner);
                 if (responsible != null) return responsible;
             }
         }
-
         return null;
     }
 
     @Unique
-    private Rule getRuleToCheck() {
-        Entity exploder = getExplosion().getEntity();
-        return (exploder instanceof AbstractWindChargeEntity)
-                ? Rule.THROW_WIND_CHARGES
-                : Rule.CAUSE_EXPLOSIONS;
-    }
-
-    @Unique
-    private void sendDenyNotification(UUID responsible, Rule rule, ServerWorld serverWorld) {
-        NotificationType type = (rule == Rule.THROW_WIND_CHARGES)
-                ? NotificationType.DENY_THROW_WIND_CHARGE
-                : NotificationType.DENY_CAUSE_EXPLOSION;
-
+    private void sendDenyNotification(UUID responsible, ServerWorld serverWorld) {
         ServerPlayerEntity serverPlayer = serverWorld.getServer()
                 .getPlayerManager()
                 .getPlayer(responsible);
-        PlayerNotification.trySend(serverPlayer, type, Color.RED);
+        PlayerNotification.trySend(serverPlayer, NotificationType.DENY_CAUSE_EXPLOSION, Color.RED);
     }
 }

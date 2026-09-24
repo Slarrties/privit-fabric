@@ -4,6 +4,7 @@ import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.client.gui.RegionGuiController;
 import dev.slarrties.privit.client.gui.screen.AddPlayerScreen;
 import dev.slarrties.privit.client.gui.screen.GroupEditScreen;
+import dev.slarrties.privit.client.gui.widget.ButtonTextures;
 import dev.slarrties.privit.client.gui.widget.GuiButton;
 import dev.slarrties.privit.client.gui.widget.list.GroupListWidget;
 import dev.slarrties.privit.client.gui.widget.list.PlayerListWidget;
@@ -22,7 +23,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.screen.ButtonTextures;
 import net.minecraft.client.gui.widget.ClickableWidget;
 
 import java.util.*;
@@ -372,7 +372,7 @@ public class RegionGroupsTab implements ITabPanel {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double verticalAmount) {
         return false;
     }
 

@@ -5,6 +5,7 @@ import dev.slarrties.privit.server.tracking.protection.RedstoneOriginTracker;
 import dev.slarrties.privit.server.tracking.redstone.RedstoneSourceRegistry;
 
 import net.minecraft.block.*;
+import net.minecraft.util.Hand;
 import net.minecraft.world.World;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.math.BlockPos;
@@ -23,13 +24,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
         BarrelBlock.class,
         AbstractFurnaceBlock.class,
         LeverBlock.class,
-        ButtonBlock.class
+        ButtonBlock.class,
+        ComparatorBlock.class,
+        AbstractCauldronBlock.class
 })
 public abstract class RedstoneOnUseOnlyMixin {
 
     @Inject(method = "onUse", at = @At("HEAD"))
-    private void onContainerUse(BlockState state, World world, BlockPos pos,
-                                PlayerEntity player, BlockHitResult hit,
+    private void onContainerUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit,
                                 CallbackInfoReturnable<ActionResult> cir) {
 
         if (!(world instanceof ServerWorld serverWorld)) return;

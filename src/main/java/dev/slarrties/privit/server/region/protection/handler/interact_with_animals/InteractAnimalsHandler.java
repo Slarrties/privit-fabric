@@ -71,10 +71,6 @@ public final class InteractAnimalsHandler implements RuleEventHandler {
             if (stack.isOf(Items.SHEARS)) return true;
         }
 
-        if (entity instanceof ArmadilloEntity && stack.isOf(Items.BRUSH)) {
-            return true;
-        }
-
         if ((entity instanceof CowEntity || entity instanceof MooshroomEntity || entity instanceof GoatEntity)
                 && (stack.isOf(Items.BUCKET) || stack.isOf(Items.BOWL))) {
             return true;

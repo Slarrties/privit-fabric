@@ -15,6 +15,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.DoorBlock;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.mob.MobEntity;
+import net.minecraft.util.Hand;
 import net.minecraft.world.World;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.math.BlockPos;
@@ -38,9 +39,8 @@ import java.util.UUID;
 public abstract class InteractDoorMixin {
 
     @Inject(method = "onUse", at = @At("HEAD"), cancellable = true)
-    private void preventManualDoorUse(BlockState state, World world, BlockPos pos,
-                                      PlayerEntity player, BlockHitResult hit,
-                                      CallbackInfoReturnable<ActionResult> cir) {
+    private void preventManualDoorUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand,
+                                      BlockHitResult hit, CallbackInfoReturnable<ActionResult> cir) {
         if (!(player instanceof ServerPlayerEntity serverPlayer)) return;
         if (!RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_DOORS, pos)) {
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_DOOR, Color.RED);

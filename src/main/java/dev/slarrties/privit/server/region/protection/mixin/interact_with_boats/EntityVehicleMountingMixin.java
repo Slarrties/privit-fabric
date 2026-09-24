@@ -7,7 +7,6 @@ import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.vehicle.BoatEntity;
-import net.minecraft.entity.vehicle.VehicleEntity;
 import net.minecraft.entity.vehicle.AbstractMinecartEntity;
 import net.minecraft.server.world.ServerWorld;
 
@@ -27,7 +26,7 @@ public abstract class EntityVehicleMountingMixin {
         Entity passenger = (Entity) (Object) this;
 
         if (!cir.getReturnValue()) return;
-        if (!(vehicle instanceof VehicleEntity)) return;
+        if (!(vehicle instanceof BoatEntity)) return;
         if (passenger.getWorld().isClient) return;
 
         if (vehicle.getWorld() instanceof ServerWorld serverWorld) {

@@ -1,28 +1,29 @@
 package dev.slarrties.privit.common.network.payload.c2s;
 
 import dev.slarrties.privit.PrivitMod;
+import dev.slarrties.privit.common.network.payload.PrivitPacket;
 
+import net.minecraft.util.Identifier;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
 
-public record SearchPlayersRequestC2SPacket(String query, int limit) implements CustomPayload {
-
-    public static final Id<SearchPlayersRequestC2SPacket> ID = new Id<>(PrivitMod.id("search_players"));
-
-    public static final PacketCodec<PacketByteBuf, SearchPlayersRequestC2SPacket> CODEC = PacketCodec.of(
-            (value, buf) -> {
-                buf.writeString(value.query);
-                buf.writeVarInt(value.limit);
-            },
-            buf -> new SearchPlayersRequestC2SPacket(
-                    buf.readString(),
-                    buf.readVarInt()
-            )
-    );
+public record SearchPlayersRequestC2SPacket(String query, int limit) implements PrivitPacket {
+    public static final Identifier ID = PrivitMod.id("search_players");
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public void write(PacketByteBuf buf) {
+        buf.writeString(query);
+        buf.writeVarInt(limit);
+    }
+
+    public static SearchPlayersRequestC2SPacket read(PacketByteBuf buf) {
+        return new SearchPlayersRequestC2SPacket(
+                buf.readString(),
+                buf.readVarInt()
+        );
+    }
+
+    @Override
+    public Identifier getId() {
         return ID;
     }
 }

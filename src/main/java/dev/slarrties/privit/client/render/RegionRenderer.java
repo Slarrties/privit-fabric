@@ -145,10 +145,10 @@ public class RegionRenderer {
                       int light, int overlay,
                       float u1, float v1, float u2, float v2, float u3, float v3, float u4, float v4) {
 
-        buffer.vertex(mat, x1, y1, z1).color(r, g, b, a).texture(u1, v1).overlay(overlay).light(light).normal(0, 1, 0);
-        buffer.vertex(mat, x2, y2, z2).color(r, g, b, a).texture(u2, v2).overlay(overlay).light(light).normal(0, 1, 0);
-        buffer.vertex(mat, x3, y3, z3).color(r, g, b, a).texture(u3, v3).overlay(overlay).light(light).normal(0, 1, 0);
-        buffer.vertex(mat, x4, y4, z4).color(r, g, b, a).texture(u4, v4).overlay(overlay).light(light).normal(0, 1, 0);
+        buffer.vertex(mat, x1, y1, z1).color(r, g, b, a).texture(u1, v1).overlay(overlay).light(light).normal(0, 1, 0).next();
+        buffer.vertex(mat, x2, y2, z2).color(r, g, b, a).texture(u2, v2).overlay(overlay).light(light).normal(0, 1, 0).next();
+        buffer.vertex(mat, x3, y3, z3).color(r, g, b, a).texture(u3, v3).overlay(overlay).light(light).normal(0, 1, 0).next();
+        buffer.vertex(mat, x4, y4, z4).color(r, g, b, a).texture(u4, v4).overlay(overlay).light(light).normal(0, 1, 0).next();
     }
 
     private void drawEdges(RegionGeometry geometry, WorldRenderContext context) {
@@ -301,10 +301,10 @@ public class RegionRenderer {
                                  float x3, float y3, float z3, float x4, float y4, float z4,
                                  float r, float g, float b, float a,
                                  float u1, float v1, float u2, float v2, float u3, float v3, float u4, float v4) {
-        buffer.vertex(mat, x1, y1, z1).color(r, g, b, a).texture(u1, v1);
-        buffer.vertex(mat, x2, y2, z2).color(r, g, b, a).texture(u2, v2);
-        buffer.vertex(mat, x3, y3, z3).color(r, g, b, a).texture(u3, v3);
-        buffer.vertex(mat, x4, y4, z4).color(r, g, b, a).texture(u4, v4);
+        buffer.vertex(mat, x1, y1, z1).texture(u1, v1).color(r, g, b, a).next();
+        buffer.vertex(mat, x2, y2, z2).texture(u2, v2).color(r, g, b, a).next();
+        buffer.vertex(mat, x3, y3, z3).texture(u3, v3).color(r, g, b, a).next();
+        buffer.vertex(mat, x4, y4, z4).texture(u4, v4).color(r, g, b, a).next();
     }
 
     public void emitEdgeQuad(VertexConsumer buffer, Matrix4f matrix,
@@ -335,10 +335,10 @@ public class RegionRenderer {
         double oy = cy / cl * halfWidth;
         double oz = cz / cl * halfWidth;
 
-        buffer.vertex(matrix, (float) (x1 - ox), (float) (y1 - oy), (float) (z1 - oz)).color(r, g, b, a);
-        buffer.vertex(matrix, (float) (x1 + ox), (float) (y1 + oy), (float) (z1 + oz)).color(r, g, b, a);
-        buffer.vertex(matrix, (float) (x2 + ox), (float) (y2 + oy), (float) (z2 + oz)).color(r, g, b, a);
-        buffer.vertex(matrix, (float) (x2 - ox), (float) (y2 - oy), (float) (z2 - oz)).color(r, g, b, a);
+        buffer.vertex(matrix, (float) (x1 - ox), (float) (y1 - oy), (float) (z1 - oz)).color(r, g, b, a).next();
+        buffer.vertex(matrix, (float) (x1 + ox), (float) (y1 + oy), (float) (z1 + oz)).color(r, g, b, a).next();
+        buffer.vertex(matrix, (float) (x2 + ox), (float) (y2 + oy), (float) (z2 + oz)).color(r, g, b, a).next();
+        buffer.vertex(matrix, (float) (x2 - ox), (float) (y2 - oy), (float) (z2 - oz)).color(r, g, b, a).next();
     }
 
     private void drawBoxEdgesNonIntersecting(BlockBox box, VertexConsumer buffer, Matrix4f matrix,
@@ -466,10 +466,12 @@ public class RegionRenderer {
 
         buffer.vertex(matrix, (float) edge.x1(), (float) edge.y1(), (float) edge.z1())
                 .color(r, g, b, a)
-                .normal(dx / len, dy / len, dz / len);
+                .normal(dx / len, dy / len, dz / len)
+                .next();
         buffer.vertex(matrix, (float) edge.x2(), (float) edge.y2(), (float) edge.z2())
                 .color(r, g, b, a)
-                .normal(dx / len, dy / len, dz / len);
+                .normal(dx / len, dy / len, dz / len)
+                .next();
     }
 
     private void emitDashedLine(VertexConsumer buffer, Matrix4f matrix, NormalizedEdge edge, float r, float g, float b, float a) {
@@ -496,8 +498,8 @@ public class RegionRenderer {
             double ey = edge.y1 + dy * t2;
             double ez = edge.z1 + dz * t2;
 
-            buffer.vertex(matrix, (float) sx, (float) sy, (float) sz).color(r, g, b, a).normal(0, 0, 0);
-            buffer.vertex(matrix, (float) ex, (float) ey, (float) ez).color(r, g, b, a).normal(0, 0, 0);
+            buffer.vertex(matrix, (float) sx, (float) sy, (float) sz).color(r, g, b, a).normal(0, 0, 0).next();
+            buffer.vertex(matrix, (float) ex, (float) ey, (float) ez).color(r, g, b, a).normal(0, 0, 0).next();
         }
     }
 }

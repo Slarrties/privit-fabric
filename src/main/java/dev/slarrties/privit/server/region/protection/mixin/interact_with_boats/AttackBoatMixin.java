@@ -8,7 +8,6 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
 import net.minecraft.entity.vehicle.BoatEntity;
-import net.minecraft.entity.vehicle.VehicleEntity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 
@@ -18,13 +17,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @AssociatedRule(Rule.INTERACT_WITH_BOATS)
-@Mixin(VehicleEntity.class)
+@Mixin(BoatEntity.class)
 public abstract class AttackBoatMixin {
 
     @Inject(method = "damage", at = @At("HEAD"), cancellable = true)
-    private void preventVehicleDamageByPlayer(DamageSource source, float amount,
-                                              CallbackInfoReturnable<Boolean> cir) {
-        if (!((VehicleEntity) (Object) this instanceof BoatEntity boat)) return;
+    private void preventVehicleDamageByPlayer(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+        BoatEntity boat = (BoatEntity) (Object) this;
+
         if (!(source.getAttacker() instanceof ServerPlayerEntity serverPlayer)) return;
 
         boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_BOATS, boat.getBlockPos());

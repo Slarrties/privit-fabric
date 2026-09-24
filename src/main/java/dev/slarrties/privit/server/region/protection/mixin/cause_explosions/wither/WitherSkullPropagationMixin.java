@@ -6,7 +6,6 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.tracking.protection.ExplosionOriginTracker;
 
 import net.minecraft.world.World;
-import net.minecraft.util.math.Vec3d;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.boss.WitherEntity;
 import net.minecraft.entity.projectile.WitherSkullEntity;
@@ -24,10 +23,10 @@ import java.util.UUID;
 public abstract class WitherSkullPropagationMixin {
 
     @Inject(
-            method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/util/math/Vec3d;)V",
+            method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/entity/LivingEntity;DDD)V",
             at = @At("TAIL")
     )
-    private void propagateFromWither(World world, LivingEntity owner, Vec3d velocity, CallbackInfo ci) {
+    private void propagateFromWither(World world, LivingEntity owner, double directionX, double directionY, double directionZ, CallbackInfo ci) {
         WitherSkullEntity skull = (WitherSkullEntity) (Object) this;
 
         if (owner instanceof WitherEntity wither && owner.getWorld() instanceof ServerWorld serverWorld) {
@@ -36,9 +35,7 @@ public abstract class WitherSkullPropagationMixin {
                     .getExplosionOriginTracker();
             UUID responsible = explosionOriginTracker.getResponsiblePlayer(wither);
 
-            if (responsible != null) {
-                explosionOriginTracker.record(skull, responsible);
-            }
+            if (responsible != null) explosionOriginTracker.record(skull, responsible);
         }
     }
 }

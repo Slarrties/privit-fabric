@@ -11,7 +11,6 @@ import net.minecraft.client.gui.Selectable;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.screen.ButtonTextures;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 
 public class ConfirmPanelWidget implements Element, Selectable, Drawable {
@@ -98,7 +97,7 @@ public class ConfirmPanelWidget implements Element, Selectable, Drawable {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double verticalAmount) {
         return false;
     }
 

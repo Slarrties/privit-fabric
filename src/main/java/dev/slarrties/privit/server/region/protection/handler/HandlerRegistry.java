@@ -7,10 +7,7 @@ import dev.slarrties.privit.server.region.protection.handler.interact_with_boats
 import dev.slarrties.privit.server.region.protection.handler.interact_with_containers.InteractContainersHandler;
 import dev.slarrties.privit.server.region.protection.handler.interact_with_minecarts.InteractionMinecartHandler;
 import dev.slarrties.privit.server.region.protection.handler.interact_with_signs.InteractSignHandler;
-import dev.slarrties.privit.server.region.protection.handler.trigger_raids.DrinkOminousBottleHandler;
 import dev.slarrties.privit.server.region.protection.handler.use_spawn_eggs.SpawnedEntityHandler;
-import dev.slarrties.privit.server.region.protection.handler.use_trial_mechanics.InteractTrialSpawnerHandler;
-import dev.slarrties.privit.server.region.protection.handler.use_trial_mechanics.InteractVaultHandler;
 import dev.slarrties.privit.server.region.protection.handler.pvp.PvpHandler;
 import dev.slarrties.privit.server.region.protection.handler.set_respawn_point.SetRespawnPointHandler;
 import dev.slarrties.privit.server.region.protection.handler.use_fluids.UseFluidHandler;
@@ -18,7 +15,6 @@ import dev.slarrties.privit.server.region.protection.handler.throw_eggs.ThrowEgg
 import dev.slarrties.privit.server.region.protection.handler.throw_ender_pearls.ThrowEnderPearlHandler;
 import dev.slarrties.privit.server.region.protection.handler.throw_potions.ThrowPotionHandler;
 import dev.slarrties.privit.server.region.protection.handler.throw_snowballs.ThrowSnowballHandler;
-import dev.slarrties.privit.server.region.protection.handler.throw_wind_charges.ThrowWindChargeHandler;
 import dev.slarrties.privit.server.region.protection.handler.trade_with_villagers.TradeVillagerHandler;
 import dev.slarrties.privit.server.region.protection.handler.use_fire_starters.UseFireStarterHandler;
 import dev.slarrties.privit.server.region.protection.handler.use_fishing_rods.UseFishingRodHandler;
@@ -41,7 +37,6 @@ public final class HandlerRegistry {
         register(new ThrowEnderPearlHandler());
         register(new EatChorusFruitHandler());
         register(new UseFireStarterHandler());
-        register(new ThrowWindChargeHandler());
         register(new ThrowSnowballHandler());
         register(new ThrowEggHandler());
         register(new UseFluidHandler());
@@ -50,10 +45,7 @@ public final class HandlerRegistry {
         register(new SetRespawnPointHandler());
         register(new PvpHandler());
         register(new SpongeHandler());
-        register(new InteractTrialSpawnerHandler());
-        register(new InteractVaultHandler());
         register(new SpawnedEntityHandler());
-        register(new DrinkOminousBottleHandler());
     }
 
     private static void register(RuleEventHandler handler) {

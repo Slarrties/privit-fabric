@@ -6,7 +6,6 @@ import dev.slarrties.privit.common.notification.NotificationType;
 import net.minecraft.text.Text;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.RenderTickCounter;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import com.mojang.blaze3d.systems.RenderSystem;
 
@@ -93,7 +92,7 @@ public class NotificationHudOverlay implements HudRenderCallback {
     }
 
     @Override
-    public void onHudRender(DrawContext context, RenderTickCounter tickCounter) {
+    public void onHudRender(DrawContext context, float tickDelta) {
         if (displayTicks <= 0 || currentMessage == null) return;
 
         MinecraftClient client = MinecraftClient.getInstance();

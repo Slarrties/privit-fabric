@@ -42,7 +42,7 @@ public final class RegionNbtPersistence {
         }
 
         try (var input = Files.newInputStream(filePath)) {
-            NbtCompound root = NbtIo.readCompressed(input, NbtSizeTracker.ofUnlimitedBytes());
+            NbtCompound root = NbtIo.readCompressed(input);
             NbtList list = root.getList("regions", NbtElement.COMPOUND_TYPE);
 
             int loaded = 0;

@@ -1,23 +1,17 @@
 package dev.slarrties.privit.common.network.payload.c2s;
 
 import dev.slarrties.privit.PrivitMod;
+import dev.slarrties.privit.common.network.payload.PrivitPacket;
 
+import net.minecraft.util.Identifier;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
 
 import java.util.Set;
 import java.util.UUID;
 import java.util.HashSet;
 
-public record RequestPlayerNamesC2SPacket(Set<UUID> uuids) implements CustomPayload {
-
-    public static final Id<RequestPlayerNamesC2SPacket> ID = new Id<>(PrivitMod.id("request_player_names"));
-
-    public static final PacketCodec<PacketByteBuf, RequestPlayerNamesC2SPacket> CODEC = PacketCodec.of(
-            RequestPlayerNamesC2SPacket::write,
-            RequestPlayerNamesC2SPacket::read
-    );
+public record RequestPlayerNamesC2SPacket(Set<UUID> uuids) implements PrivitPacket {
+    public static final Identifier ID = PrivitMod.id("request_player_names");
 
     public RequestPlayerNamesC2SPacket {
         if (uuids.size() > 100) {
@@ -25,7 +19,8 @@ public record RequestPlayerNamesC2SPacket(Set<UUID> uuids) implements CustomPayl
         }
     }
 
-    private void write(PacketByteBuf buf) {
+    @Override
+    public void write(PacketByteBuf buf) {
         buf.writeVarInt(uuids.size());
 
         for (UUID uuid : uuids) {
@@ -33,7 +28,7 @@ public record RequestPlayerNamesC2SPacket(Set<UUID> uuids) implements CustomPayl
         }
     }
 
-    private static RequestPlayerNamesC2SPacket read(PacketByteBuf buf) {
+    public static RequestPlayerNamesC2SPacket read(PacketByteBuf buf) {
         int size = buf.readVarInt();
         Set<UUID> uuids = new HashSet<>(size);
 
@@ -45,7 +40,7 @@ public record RequestPlayerNamesC2SPacket(Set<UUID> uuids) implements CustomPayl
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Identifier getId() {
         return ID;
     }
 }

@@ -2,6 +2,7 @@ package dev.slarrties.privit.client.gui.screen;
 
 import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.client.gui.RegionGuiController;
+import dev.slarrties.privit.client.gui.widget.ButtonTextures;
 import dev.slarrties.privit.client.gui.widget.GuiButton;
 import dev.slarrties.privit.client.gui.widget.CustomTextField;
 import dev.slarrties.privit.common.region.RegionGroups;
@@ -15,7 +16,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ButtonTextures;
 
 import java.util.Optional;
 
@@ -204,7 +204,7 @@ public class GroupEditScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
+        renderBackground(context);
         super.render(context, mouseX, mouseY, delta);
 
         int centerX = width / 2;
@@ -216,7 +216,7 @@ public class GroupEditScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void renderBackground(DrawContext context) {
         int x = (width - WIDTH) / 2;
         int y = (height - HEIGHT) / 2;
         context.fillGradient(0, 0, width, height, 0xC0101010, 0xD0101010);
