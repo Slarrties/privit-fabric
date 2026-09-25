@@ -20,9 +20,7 @@
 		"server": ["dev.slarrties.privit.server.PrivitServer"],
 		"modmenu": [ "dev.slarrties.privit.client.config.ModMenuIntegration" ]
 	},
-	"mixins": [
-		"privit.mixins.json"
-	],
+	"mixins": ["privit.mixins.json"],
 	"depends": {
 		"fabricloader": ">=0.18.1",
 		"minecraft": "~1.21.1",
