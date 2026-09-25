@@ -11,7 +11,7 @@ public interface ITabPanel {
     void render(DrawContext context, int mouseX, int mouseY, float delta);
     default void renderPendingTooltips(DrawContext context) {}
     boolean mouseClicked(double mouseX, double mouseY, int button);
-    boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount);
+    boolean mouseScrolled(double mouseX, double mouseY, double verticalAmount);
     void setVisible(boolean visible);
     void updateUI();
     void updateVisibility();

@@ -76,3 +76,12 @@ To support the menu functionality, you need to install mod menu and cloth config
 - Fixed a vulnerability where a player with a disabled TRIGGER_RAIDS rule could drink an ominous bottle in a region .
 
 - Fixed a vulnerability in which a player with a disabled BUILD rule, as well as mobs under its influence, could trample beds in the region.
+
+
+
+## 1.4.2 — 25-09-2026
+
+### Fixed
+- Fixed the bug, where the region name text would flicker randomly during the HUD fade-out animation.
+
+- Fixed the bug, where the cube icon would fail to load instantly during the HUD fade-in animation, causing the text to flick.
