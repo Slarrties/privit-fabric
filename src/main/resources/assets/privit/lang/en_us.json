@@ -22,7 +22,7 @@
   "privit.gui.properties.area_widget.conflicts": "⚠ This region conflicts with other regions.\nEnable the grid to see the conflict area.",
   "privit.gui.groups.button.rules": "rules",
   "privit.gui.groups.button.players": "players",
-  "privit.gui.groups.button.players.disabled": "§8No need to add players\nto this group\n(The rules of this group are automatically\napplied to all players who are not\nmembers of other groups)",
+  "privit.gui.groups.button.players.disabled": "§8No need to add players to this group\n(The rules of this group are automatically applied to all players who are not members of other groups)",
   "privit.gui.groups.button.edit": "edit group...",
   "privit.gui.groups.button.edit.disabled": "§8Editing this group\nis not allowed",
   "privit.gui.groups.text.title": "Groups list",

@@ -22,6 +22,8 @@ public class RegionColorScreen extends Screen {
     private static final int GAP = 6;
     private static final int COLUMNS = 5;
     private static final int BUTTON_SIZE = 20;
+    private static final int BG_WIDTH = 210;
+    private static final int BG_HEIGHT = 180;
 
     private static final Identifier BACKGROUND = Identifier.of(PrivitMod.MOD_ID, "textures/gui/region_gui_background.png");
     private static final ButtonTextures BUTTON_BACKGROUND = new ButtonTextures(
@@ -42,9 +44,12 @@ public class RegionColorScreen extends Screen {
 
     @Override
     protected void init() {
+        int bgX = (this.width - BG_WIDTH) / 2;
+        int bgY = (this.height - BG_HEIGHT) / 2;
         int gridWidth = COLUMNS * BUTTON_SIZE + (COLUMNS - 1) * GAP;
-        int startX = (width - gridWidth) / 2;
-        int startY = 75;
+        int startX = bgX + (BG_WIDTH - gridWidth) / 2;
+        int startY = bgY + 30;
+
         Color currentColor = this.controller.getLocalState().color();
         Color[] colors = Color.values();
 
@@ -79,10 +84,15 @@ public class RegionColorScreen extends Screen {
             addDrawableChild(button);
         }
 
+        int cancelWidth = 100;
+        int cancelHeight = 20;
+        int cancelX = bgX + (BG_WIDTH - cancelWidth) / 2;
+        int cancelY = startY + 3 * (BUTTON_SIZE + GAP) + 25;
+
         addDrawableChild(new GuiButton.Builder(Text.translatable("privit.gui.button.cancel"), btn -> {
             client.setScreen(new RegionScreen(this.controller));
         })
-                .dimensions(width / 2 - 50, startY + 3 * (BUTTON_SIZE + GAP) + 25, 100, 20)
+                .dimensions(cancelX, cancelY, cancelWidth, cancelHeight)
                 .setBackground(WIDE_BUTTON_BACKGROUND)
                 .build());
     }
@@ -111,19 +121,21 @@ public class RegionColorScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("privit.gui.color.text.title"), width / 2, 55, 0xFFFFFF);
+        int bgX = (this.width - BG_WIDTH) / 2;
+        int bgY = (this.height - BG_HEIGHT) / 2;
 
+        renderBackground(context, mouseX, mouseY, delta);
+        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("privit.gui.color.text.title"), bgX + BG_WIDTH / 2, bgY + 15, 0xFFFFFF);
         super.render(context, mouseX, mouseY, delta);
     }
 
     @Override
     public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        int x = (width - 210) / 2;
-        int y = (height - 180) / 2;
+        int x = (this.width - BG_WIDTH) / 2;
+        int y = (this.height - BG_HEIGHT) / 2;
 
-        context.fillGradient(0, 0, width, height, 0xC0101010, 0xD0101010);
-        context.drawTexture(BACKGROUND, x, y, 0, 0, 210, 180, 210, 180);
+        context.fillGradient(0, 0, this.width, this.height, 0xC0101010, 0xD0101010);
+        context.drawTexture(BACKGROUND, x, y, 0, 0, BG_WIDTH, BG_HEIGHT, BG_WIDTH, BG_HEIGHT);
     }
 
     @Override
