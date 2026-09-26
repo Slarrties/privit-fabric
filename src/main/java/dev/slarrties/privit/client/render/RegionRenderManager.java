@@ -286,11 +286,12 @@ public final class RegionRenderManager {
 
     public static void updateRegion(RegionRenderEntry entry) { RegionRenderCache.getInstance().updateEntry(entry); }
 
-    public static void setGridVisible(UUID regionId, boolean visible) { RegionRenderCache.getInstance().setGridVisible(regionId, visible); }
+    public static void setGridVisible(UUID regionId, boolean visible) {
+        RegionRenderCache.getInstance().setGridVisible(regionId, visible);
+    }
 
     public static boolean isGridVisible(UUID regionId) {
-        RegionRenderEntry entry = RegionRenderCache.getInstance().getEntryIfPresent(regionId);
-        return entry != null && entry.isGridVisible();
+        return RegionRenderCache.getInstance().isGridVisible(regionId);
     }
 
     // =====================================================================
