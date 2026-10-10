@@ -103,3 +103,27 @@ To support the menu functionality, you need to install mod menu and cloth config
 
 ### Changed
 - The mod icon has been replaced.
+
+
+
+## 1.4.5 — 10-10-2026
+
+## Region grid renderer patch:
+
+### Added
+
+- Added animation of textures for highlighting region conflict zones
+
+- Automatically switches rendering mode when enabling/disabling iris shaders
+
+### Changed
+
+- Improved visibility of grid edges and faces using shaders (not supported by all shaders)
+
+### Fixed
+
+- Completely reworked rendering code
+
+- Improved optimization
+
+- Fixed a bug that caused grid colors to display incorrectly when using shaders

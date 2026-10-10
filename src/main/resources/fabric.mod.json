@@ -29,6 +29,7 @@
 	},
 	"suggests": {
 		"modmenu": "*",
-		"cloth-config": "*"
+		"cloth-config": "*",
+		"iris": "*"
 	}
 }

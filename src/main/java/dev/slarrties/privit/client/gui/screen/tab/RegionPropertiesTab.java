@@ -6,7 +6,7 @@ import dev.slarrties.privit.client.gui.widget.GuiButton;
 import dev.slarrties.privit.client.gui.widget.CustomTextField;
 import dev.slarrties.privit.client.gui.widget.RegionAreaWidget;
 import dev.slarrties.privit.client.gui.screen.RegionColorScreen;
-import dev.slarrties.privit.client.render.RegionRenderManager;
+import dev.slarrties.privit.client.render.pipeline.RegionRenderSystem;
 import dev.slarrties.privit.common.network.payload.c2s.RegionCreateC2SPacket;
 import dev.slarrties.privit.common.network.payload.c2s.RegionDeleteC2SPacket;
 import dev.slarrties.privit.common.network.payload.c2s.RegionGridStateC2SPacket;
@@ -136,10 +136,10 @@ public class RegionPropertiesTab implements ITabPanel {
 
         gridButton = new GuiButton.Builder(Text.empty(), button -> {
             UUID regionId = this.controller.getLocalState().id();
-            boolean current = RegionRenderManager.isGridVisible(regionId);
+            boolean current = RegionRenderSystem.isGridVisible(regionId);
             boolean newVisible = !current;
 
-            RegionRenderManager.setGridVisible(regionId, newVisible);
+            RegionRenderSystem.setGridVisible(regionId, newVisible);
             ClientPlayNetworking.send(new RegionGridStateC2SPacket(regionId, newVisible));
             updateGridButton();
         })
@@ -161,7 +161,7 @@ public class RegionPropertiesTab implements ITabPanel {
             } else {
                 ClientPlayNetworking.send(new RegionDeleteC2SPacket(regionId));
                 ClientPlayNetworking.send(new RegionGridStateC2SPacket(regionId, false));
-                RegionRenderManager.disableAndRemove(regionId);
+                RegionRenderSystem.disableAndRemove(regionId);
             }
 
             if (MinecraftClient.getInstance().currentScreen != null)
@@ -261,7 +261,7 @@ public class RegionPropertiesTab implements ITabPanel {
     private Identifier getGridIcon() {
         UUID regionId = this.controller.getLocalState().id();
 
-        return RegionRenderManager.isGridVisible(regionId)
+        return RegionRenderSystem.isGridVisible(regionId)
                 ? ICON_SHOW_GRID
                 : ICON_HIDE_GRID;
     }
@@ -269,7 +269,7 @@ public class RegionPropertiesTab implements ITabPanel {
     private Text getGridTooltip() {
         UUID regionId = this.controller.getLocalState().id();
 
-        return RegionRenderManager.isGridVisible(regionId)
+        return RegionRenderSystem.isGridVisible(regionId)
                 ? Text.translatable("privit.gui.properties.button.hide_grid")
                 : Text.translatable("privit.gui.properties.button.show_grid");
     }
