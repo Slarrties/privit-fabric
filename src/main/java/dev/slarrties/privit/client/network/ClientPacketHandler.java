@@ -6,9 +6,8 @@ import dev.slarrties.privit.client.gui.screen.AddPlayerScreen;
 import dev.slarrties.privit.client.gui.screen.RegionScreen;
 import dev.slarrties.privit.client.hud.NotificationHudOverlay;
 import dev.slarrties.privit.client.hud.RegionNameHudOverlay;
-import dev.slarrties.privit.client.render.RegionRenderCache;
-import dev.slarrties.privit.client.render.RegionRenderEntry;
-import dev.slarrties.privit.client.render.RegionRenderManager;
+import dev.slarrties.privit.client.render.state.RegionRenderEntry;
+import dev.slarrties.privit.client.render.pipeline.RegionRenderSystem;
 import dev.slarrties.privit.client.util.ClientPlayerIdentityCache;
 import dev.slarrties.privit.common.region.Color;
 import dev.slarrties.privit.common.network.payload.s2c.*;
@@ -99,7 +98,7 @@ public final class ClientPacketHandler {
 
             client.execute(() -> {
                 if (!payload.enabled()) {
-                    RegionRenderManager.disableAndRemove(payload.regionId());
+                    RegionRenderSystem.disableAndRemove(payload.regionId());
                     return;
                 }
 
@@ -114,8 +113,8 @@ public final class ClientPacketHandler {
                         .withDraft(draft)
                         .withConflicts(payload.conflictBounds());
 
-                RegionRenderCache.getInstance().updateOrMerge(entry);
-                RegionRenderManager.setGridVisible(payload.regionId(), true);
+                RegionRenderSystem.updateOrMerge(entry);
+                RegionRenderSystem.setGridVisible(payload.regionId(), true);
             });
         });
 
@@ -125,7 +124,7 @@ public final class ClientPacketHandler {
 
         ClientPlayNetworking.registerGlobalReceiver(RegionGridClearS2CPacket.ID, (client, handler, buf, responseSender) -> {
             RegionGridClearS2CPacket payload = RegionGridClearS2CPacket.read(buf);
-            client.execute(RegionRenderManager::clearAll);
+            client.execute(RegionRenderSystem::clearAll);
         });
 
         // =====================================================================
@@ -189,7 +188,7 @@ public final class ClientPacketHandler {
         // =====================================================================
 
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            RegionRenderManager.clearAll();
+            RegionRenderSystem.clearAll();
             RegionNameHudOverlay.INSTANCE.update(null, null);
             ClientPlayerIdentityCache.getInstance().clear();
         });
@@ -206,6 +205,6 @@ public final class ClientPacketHandler {
         RegionRenderEntry entry = RegionRenderEntry.create(regionId, color, original)
                 .withDraft(draft)
                 .withConflicts(conflicts);
-        RegionRenderCache.getInstance().updateOrMerge(entry);
+        RegionRenderSystem.updateOrMerge(entry);
     }
 }

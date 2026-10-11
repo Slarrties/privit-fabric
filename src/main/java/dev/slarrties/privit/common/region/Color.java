@@ -36,11 +36,6 @@ public enum Color {
 
     public int getColorValue() { return rgb; }
 
-    public int getArgb(float alpha) {
-        int a = Math.max(0, Math.min(255, (int) (alpha * 255f)));
-        return (a << 24) | (rgb & 0xFFFFFF);
-    }
-
     public static Color getDefault() { return WHITE; }
 
     public static Color fromCode(String code) {
@@ -49,5 +44,47 @@ public enum Color {
             if (color.code.equalsIgnoreCase(code)) return color;
         }
         return getDefault();
+    }
+
+    public int getArgb(float alpha) {
+        int a = Math.max(0, Math.min(255, (int) (alpha * 255f)));
+        return (a << 24) | (rgb & 0xFFFFFF);
+    }
+
+    public static float[] rgbToHsb(float r, float g, float b) {
+        float max = Math.max(r, Math.max(g, b));
+        float min = Math.min(r, Math.min(g, b));
+        float delta = max - min;
+        float h = 0;
+
+        if (delta != 0) {
+            if (max == r) h = ((g - b) / delta) % 6;
+            else if (max == g) h = ((b - r) / delta) + 2;
+            else h = ((r - g) / delta) + 4;
+            h /= 6;
+            if (h < 0) h += 1;
+        }
+        float s = (max == 0) ? 0 : delta / max;
+
+        return new float[]{h, s, max};
+    }
+
+    public static float[] hsbToRgb(float h, float s, float v) {
+        float c = v * s;
+        float x = c * (1 - Math.abs((h * 6) % 2 - 1));
+        float m = v - c;
+        float r, g, b;
+        int sector = (int) (h * 6);
+
+        switch (sector) {
+            case 0: r = c; g = x; b = 0; break;
+            case 1: r = x; g = c; b = 0; break;
+            case 2: r = 0; g = c; b = x; break;
+            case 3: r = 0; g = x; b = c; break;
+            case 4: r = x; g = 0; b = c; break;
+            default: r = c; g = 0; b = x; break;
+        }
+
+        return new float[]{r + m, g + m, b + m};
     }
 }

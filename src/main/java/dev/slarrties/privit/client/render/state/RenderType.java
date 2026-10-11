@@ -1,4 +1,4 @@
-package dev.slarrties.privit.client.render;
+package dev.slarrties.privit.client.render.state;
 
 public enum RenderType {
     CONFLICT(100),

@@ -13,6 +13,7 @@ base {
 repositories {
 	maven { url "https://maven.shedaniel.me/" }
 	maven { url "https://maven.terraformersmc.com/releases/" }
+	maven { url "https://api.modrinth.com/maven" }
 }
 
 dependencies {
@@ -35,6 +36,9 @@ dependencies {
 
 	// Mixin extras
 	implementation(annotationProcessor("io.github.llamalad7:mixinextras-fabric:0.5.4"))
+
+	// Iris shaders
+	modImplementation "maven.modrinth:iris:1.6.17+1.20.1"
 }
 
 loom {
