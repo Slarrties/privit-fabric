@@ -33,7 +33,7 @@ public abstract class SculkCatalystBloomMixin {
                     target = "Lnet/minecraft/block/entity/SculkSpreadManager;spread(Lnet/minecraft/util/math/BlockPos;I)V"
             )
     )
-    private void beforeSpread(ServerWorld world, RegistryEntry<GameEvent> event, GameEvent.Emitter emitter, Vec3d emitterPos,
+    private void beforeSpread(ServerWorld world, GameEvent event, GameEvent.Emitter emitter, Vec3d emitterPos,
                               CallbackInfoReturnable<Boolean> cir, @Local LivingEntity livingEntity) {
         UUID responsible = resolveResponsible(livingEntity, world);
         if (responsible == null) return;
@@ -49,8 +49,8 @@ public abstract class SculkCatalystBloomMixin {
                     shift = At.Shift.AFTER
             )
     )
-    private void afterSpread(ServerWorld world, RegistryEntry<GameEvent> event, GameEvent.Emitter emitter,
-                             Vec3d emitterPos, CallbackInfoReturnable<Boolean> cir) {
+    private void afterSpread(ServerWorld world, GameEvent event, GameEvent.Emitter emitter, Vec3d emitterPos,
+                             CallbackInfoReturnable<Boolean> cir) {
         if (SculkBloomContext.getCurrent() != null) {
             SculkBloomContext.pop();
         }

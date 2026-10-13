@@ -134,3 +134,11 @@ To support the menu functionality, you need to install mod menu and cloth config
 - Improved optimization
 
 - Fixed a bug that caused grid colors to display incorrectly when using shaders
+
+
+
+## 1.4.6 — 13-10-2026
+
+### Fixed
+
+- Fixed a bug that caused the game crash when loading chunks with sculk catalyst block.
