@@ -12,14 +12,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.util.Identifier;
 import net.fabricmc.api.ModInitializer;
+import net.minecraft.resources.Identifier;
 
 public class PrivitMod implements ModInitializer {
 	public static final String MOD_ID = "privit";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-	public static Identifier id(String path) { return Identifier.of(MOD_ID, path); }
+	public static Identifier id(String path) {
+		return Identifier.fromNamespaceAndPath(MOD_ID, path);
+	}
 
 	public static void debug(String msg, Object... args) {
 		LOGGER.info("[DEBUG] " + msg, args);

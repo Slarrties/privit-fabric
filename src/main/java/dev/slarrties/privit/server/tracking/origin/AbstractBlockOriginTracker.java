@@ -2,9 +2,9 @@ package dev.slarrties.privit.server.tracking.origin;
 
 import dev.slarrties.privit.PrivitMod;
 
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -13,26 +13,23 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class AbstractBlockOriginTracker implements BlockOriginTracker {
 
-    protected final ServerWorld world;
+    protected final ServerLevel level;
     protected final ConcurrentHashMap<Long, UUID> responsible = new ConcurrentHashMap<>();
 
-    protected AbstractBlockOriginTracker(ServerWorld world) {
-        this.world = world;
+    protected AbstractBlockOriginTracker(ServerLevel level) {
+        this.level = level;
     }
 
     @Override
     public void record(BlockPos pos, UUID playerUuid) {
-        if (pos == null || playerUuid == null || world.isClient) return;
-
+        if (pos == null || playerUuid == null || level.isClientSide()) return;
         responsible.put(pos.asLong(), playerUuid);
     }
 
     @Override
     public void propagate(BlockPos from, BlockPos to) {
-        if (from == null || to == null || world.isClient) return;
-
+        if (from == null || to == null || level.isClientSide()) return;
         UUID uuid = responsible.get(from.asLong());
-
         if (uuid != null) {
             responsible.put(to.asLong(), uuid);
         }
@@ -68,24 +65,30 @@ public abstract class AbstractBlockOriginTracker implements BlockOriginTracker {
     }
 
     @Override
-    public NbtCompound toNbt() {
-        NbtCompound tag = new NbtCompound();
+    public CompoundTag toNbt() {
+        CompoundTag tag = new CompoundTag();
+
         for (var entry : responsible.entrySet()) {
-            tag.putUuid(Long.toString(entry.getKey()), entry.getValue());
+            tag.putString(Long.toString(entry.getKey()), entry.getValue().toString());
         }
+
         return tag;
     }
 
     @Override
-    public void fromNbt(NbtCompound tag) {
-        responsible.clear();
+    public void fromNbt(CompoundTag tag) {
         if (tag == null) return;
 
-        for (String key : tag.getKeys()) {
+        responsible.clear();
+        for (String key : tag.keySet()) {
             try {
                 long posLong = Long.parseLong(key);
-                UUID uuid = tag.getUuid(key);
-                responsible.put(posLong, uuid);
+                String uuidStr = tag.getStringOr(key, "");
+
+                if (!uuidStr.isEmpty()) {
+                    UUID uuid = UUID.fromString(uuidStr);
+                    responsible.put(posLong, uuid);
+                }
             } catch (Exception e) {
                 PrivitMod.LOGGER.warn("[{}] Skipping corrupted entry: {}", getClass().getSimpleName(), key);
             }

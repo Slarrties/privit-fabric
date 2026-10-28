@@ -7,39 +7,41 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.block.BlockState;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.enchantment.effect.entity.ReplaceDiskEnchantmentEffect;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.item.enchantment.effects.ReplaceDisk;
 
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 
-import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.At;
-
 @AssociatedRule(Rule.USE_FROST_WALKER)
-@Mixin(ReplaceDiskEnchantmentEffect.class)
+@Mixin(ReplaceDisk.class)
 public abstract class UseFrostWalkerMixin {
 
     @WrapOperation(
-            method = "apply(Lnet/minecraft/server/world/ServerWorld;ILnet/minecraft/enchantment/EnchantmentEffectContext;Lnet/minecraft/entity/Entity;Lnet/minecraft/util/math/Vec3d;)V",
+            method = "apply",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/server/world/ServerWorld;setBlockState(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;)Z"
+                    target = "Lnet/minecraft/server/level/ServerLevel;setBlockAndUpdate(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)Z"
             )
     )
-    private boolean preventFrostWalkerFreeze(ServerWorld world, BlockPos pos, BlockState newState,
-                                             Operation<Boolean> original, @Local(argsOnly = true) Entity user) {
-        if (!(user instanceof ServerPlayerEntity serverPlayer)) return original.call(world, pos, newState);
-        if (RegionPermissionChecker.isAllowed(serverPlayer.getUuid(), Rule.USE_FROST_WALKER, pos, world)) {
-            return original.call(world, pos, newState);
+    private boolean preventFrostWalkerFreeze(
+            ServerLevel serverLevel, BlockPos pos, BlockState blockState,
+            Operation<Boolean> original,
+            @Local(argsOnly = true) Entity entity) {
+        if (entity instanceof ServerPlayer serverPlayer) {
+            if (!RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.USE_FROST_WALKER, pos, serverLevel)) {
+                PlayerNotification.trySend(serverPlayer, NotificationType.DENY_USE_FROST_WALKER, Color.RED);
+                return false;
+            }
         }
 
-        PlayerNotification.trySend(serverPlayer, NotificationType.DENY_USE_FROST_WALKER, Color.RED);
-        return false;
+        return original.call(serverLevel, pos, blockState);
     }
 }

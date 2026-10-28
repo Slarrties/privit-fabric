@@ -1,6 +1,6 @@
 package dev.slarrties.privit.server.tracking.context;
 
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
 public final class FireSpreadContext {
 
@@ -22,7 +22,7 @@ public final class FireSpreadContext {
 
     public static FireSpreadContext getCurrent() { return CURRENT.get(); }
 
-    public BlockPos getSourcePos() { return BlockPos.fromLong(sourceFirePos); }
+    public BlockPos getSourcePos() { return BlockPos.of(sourceFirePos); }
 
-    public BlockPos getTargetPos() { return BlockPos.fromLong(targetPos); }
+    public BlockPos getTargetPos() { return BlockPos.of(targetPos); }
 }

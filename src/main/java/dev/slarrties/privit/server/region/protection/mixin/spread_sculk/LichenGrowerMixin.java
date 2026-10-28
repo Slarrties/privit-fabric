@@ -1,14 +1,18 @@
 package dev.slarrties.privit.server.region.protection.mixin.spread_sculk;
 
+import com.llamalad7.mixinextras.sugar.Local;
+
 import dev.slarrties.privit.common.region.rule.Rule;
 import dev.slarrties.privit.server.tracking.context.SculkBloomContext;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.WorldAccess;
-import net.minecraft.block.LichenGrower;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.SculkSpreader;
+import net.minecraft.world.level.block.SculkVeinBlock;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,22 +20,33 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.UUID;
-import java.util.Optional;
 
 @AssociatedRule(Rule.SPREAD_SCULK)
-@Mixin(LichenGrower.class)
+@Mixin(SculkVeinBlock.class)
 public abstract class LichenGrowerMixin {
 
-    @Inject(method = "place", at = @At("HEAD"), cancellable = true)
-    private void privit$onLichenPlace(WorldAccess world, LichenGrower.GrowPos growPos,
-                                      boolean markForPostProcessing, CallbackInfoReturnable<Optional<?>> cir) {
-        if (!(world instanceof ServerWorld serverWorld)) return;
+    @Inject(
+            method = "attemptPlaceSculk",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/world/level/LevelAccessor;setBlock(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;I)Z"
+            ),
+            cancellable = true
+    )
+    private void preventSculkPlacement(
+            SculkSpreader spreader,
+            LevelAccessor level,
+            BlockPos pos,
+            RandomSource random,
+            CallbackInfoReturnable<Boolean> cir,
+            @Local(name = "supportPos") BlockPos supportPos
+    ) {
+        if (!(level instanceof ServerLevel serverLevel)) return;
 
         UUID responsible = SculkBloomContext.getResponsible();
         if (responsible == null) return;
-
-        BlockPos pos = growPos.pos();
-        boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.SPREAD_SCULK, pos, serverWorld);
-        if (!allowed) cir.setReturnValue(Optional.empty());
+        if (!RegionPermissionChecker.isAllowed(responsible, Rule.SPREAD_SCULK, supportPos, serverLevel)) {
+            cir.setReturnValue(false);
+        }
     }
 }

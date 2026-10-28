@@ -1,44 +1,49 @@
 package dev.slarrties.privit.client.hud;
 
+import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.common.region.Color;
 import dev.slarrties.privit.common.notification.NotificationType;
 
-import net.minecraft.text.Text;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.RenderTickCounter;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.network.chat.Component;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 
-public class NotificationHudOverlay implements HudRenderCallback {
-
+public final class NotificationHudOverlay implements HudElement {
     private static String currentMessage = null;
-    private static Color currentColor = Color.WHITE;
+    private static Color currentColor = Color.getDefault();
     private static int displayTicks = 0;
 
     private static final int TOTAL_DURATION = 180;
     private static final int FADE_IN_DURATION = 10;
     private static final int FADE_OUT_DURATION = 15;
 
+    private NotificationHudOverlay() {}
+
+    public static void register() {
+        HudElementRegistry.addLast(PrivitMod.id("notification_overlay"), new NotificationHudOverlay());
+    }
+
     public static void showNotification(NotificationType type, Color color) {
         String translationKey = switch (type) {
             case REGION_DENY_CHANGES -> "privit.notification.deny_changes";
-            case REGION_CREATED  -> "privit.notification.region_created";
-            case REGION_CREATION_FAILED  -> "privit.notification.region_creation_failed";
-            case REGION_UPDATED  -> "privit.notification.region_updated";
-            case REGION_UPDATE_FAILED  -> "privit.notification.region_update_failed";
-            case REGION_DELETED  -> "privit.notification.region_deleted";
-            case REGION_DELETION_FAILED  -> "privit.notification.region_deletion_failed";
-            case REGION_NOT_FOUND  -> "privit.notification.region_not_found";
+            case REGION_CREATED -> "privit.notification.region_created";
+            case REGION_CREATION_FAILED -> "privit.notification.region_creation_failed";
+            case REGION_UPDATED -> "privit.notification.region_updated";
+            case REGION_UPDATE_FAILED -> "privit.notification.region_update_failed";
+            case REGION_DELETED -> "privit.notification.region_deleted";
+            case REGION_DELETION_FAILED -> "privit.notification.region_deletion_failed";
+            case REGION_NOT_FOUND -> "privit.notification.region_not_found";
             case REGION_TERRITORY_CONFLICT -> "privit.notification.region_territory_conflict";
             case REGION_TOO_BIG -> "privit.notification.region_too_big";
             case REGION_ID_CONFLICT -> "privit.notification.region_id_conflict";
             case REGION_NOT_ACCEPTED -> "privit.notification.region_not_accepted";
             case REGIONS_LIMIT_REACHED -> "privit.notification.regions_limit_reached";
-
             case DENY_MANAGE -> "privit.notification.deny_manage";
-            case DENY_BREAK_BLOCK  -> "privit.notification.deny_break_block";
-            case DENY_PLACE_BLOCK  -> "privit.notification.deny_place_block";
+            case DENY_BREAK_BLOCK -> "privit.notification.deny_break_block";
+            case DENY_PLACE_BLOCK -> "privit.notification.deny_place_block";
             case DENY_INTERACT_DOOR -> "privit.notification.deny_interact_door";
             case DENY_INTERACT_TRAPDOOR -> "privit.notification.deny_interact_trapdoor";
             case DENY_INTERACT_LEVER -> "privit.notification.deny_interact_lever";
@@ -83,27 +88,28 @@ public class NotificationHudOverlay implements HudRenderCallback {
             case DENY_TRIGGER_RAID -> "privit.notification.deny_trigger_raid";
         };
 
-        currentMessage = Text.translatable(translationKey).getString();
-        currentColor = color != null ? color : Color.WHITE;
+        currentMessage = Component.translatable(translationKey).getString();
+        currentColor = color != null ? color : Color.getDefault();
         displayTicks = TOTAL_DURATION;
     }
 
     public static void showNotification(NotificationType type) {
-        showNotification(type, Color.WHITE);
+        showNotification(type, Color.getDefault());
     }
 
     @Override
-    public void onHudRender(DrawContext context, RenderTickCounter tickCounter) {
+    public void extractRenderState(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
         if (displayTicks <= 0 || currentMessage == null) return;
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        int screenWidth = client.getWindow().getScaledWidth();
-        int screenHeight = client.getWindow().getScaledHeight();
-        int textWidth = client.textRenderer.getWidth(currentMessage);
+        int screenWidth = graphics.guiWidth();
+        int screenHeight = graphics.guiHeight();
+
+        Minecraft minecraft = Minecraft.getInstance();
+        int textWidth = minecraft.font.width(currentMessage);
         int x = (screenWidth - textWidth) / 2;
         int y = screenHeight - 70;
-        float alpha;
 
+        float alpha;
         if (displayTicks > TOTAL_DURATION - FADE_IN_DURATION) {
             int fadeTicks = TOTAL_DURATION - displayTicks;
             alpha = (float) fadeTicks / FADE_IN_DURATION;
@@ -113,27 +119,16 @@ public class NotificationHudOverlay implements HudRenderCallback {
             alpha = 1.0f;
         }
 
-        int baseColor = currentColor.getFormatting().getColorValue();
+        int baseColor = currentColor.getColorValue();
         if (baseColor == -1) baseColor = 0xFFFFFF;
         int textColor = (int) (alpha * 255) << 24 | (baseColor & 0xFFFFFF);
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-
-        context.drawTextWithShadow(
-                client.textRenderer,
-                currentMessage,
-                x,
-                y,
-                textColor
-        );
-
-        RenderSystem.disableBlend();
+        graphics.text(minecraft.font, currentMessage, x, y, textColor, true);
         displayTicks--;
 
         if (displayTicks <= 0) {
             currentMessage = null;
-            currentColor = Color.WHITE;
+            currentColor = Color.getDefault();
         }
     }
 }

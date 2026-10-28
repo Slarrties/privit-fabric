@@ -8,39 +8,46 @@ import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.projectile.FireballEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.entity.projectile.ProjectileDeflection;
+import net.minecraft.world.entity.projectile.hurtingprojectile.Fireball;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.UUID;
 
 @AssociatedRule(Rule.CAUSE_EXPLOSIONS)
-@Mixin(FireballEntity.class)
+@Mixin(Projectile.class)
 public abstract class GhastFireballDamageMixin {
 
-    @Inject(method = "onEntityHit", at = @At("HEAD"), cancellable = true)
-    private void preventGhastFireballDirectDamage(EntityHitResult entityHitResult, CallbackInfo ci) {
-        FireballEntity fireball = (FireballEntity) (Object) this;
-        Entity target = entityHitResult.getEntity();
+    @Inject(method = "hitTargetOrDeflectSelf", at = @At("HEAD"), cancellable = true)
+    private void preventGhastFireballDirectDamage(HitResult hitResult, CallbackInfoReturnable<ProjectileDeflection> cir) {
+        if (!(hitResult instanceof EntityHitResult entityHitResult)) return;
+        if (!(((Object) this) instanceof Fireball fireball)) return; // TODO: is it works?
 
-        if (fireball.getWorld() instanceof ServerWorld serverWorld) {
-            UUID responsible = WorldRegistry.get(serverWorld)
+        Entity target = entityHitResult.getEntity();
+        if (fireball.level() instanceof ServerLevel serverLevel) {
+            UUID responsible = WorldRegistry.get(serverLevel)
                     .getTrackerManager()
                     .getExplosionOriginTracker()
-                    .getResponsiblePlayer(fireball);
+                    .getResponsible(fireball);
 
             if (responsible == null) return;
-            if (!RegionPermissionChecker.isAllowed(responsible, Rule.CAUSE_EXPLOSIONS, target.getBlockPos(), serverWorld)) {
-                ServerPlayerEntity serverPlayer = serverWorld.getServer().getPlayerManager().getPlayer(responsible);
+
+            if (!RegionPermissionChecker.isAllowed(responsible, Rule.CAUSE_EXPLOSIONS, target.blockPosition(), serverLevel)) {
+                ServerPlayer serverPlayer = serverLevel.getServer()
+                        .getPlayerList()
+                        .getPlayer(responsible);
                 PlayerNotification.trySend(serverPlayer, NotificationType.DENY_CAUSE_EXPLOSION, Color.RED);
-                ci.cancel();
+                cir.cancel();
             }
         }
     }

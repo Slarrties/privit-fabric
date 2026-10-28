@@ -1,19 +1,18 @@
 package dev.slarrties.privit.server.region.protection.mixin.use_fire_starters;
 
 import dev.slarrties.privit.common.region.rule.Rule;
-import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.world.WorldRegistry;
+import dev.slarrties.privit.server.region.protection.AssociatedRule;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.entity.projectile.TridentEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.entity.projectile.arrow.ThrownTrident;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -21,45 +20,23 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @AssociatedRule(Rule.USE_FIRE_STARTERS)
-@Mixin(TridentEntity.class)
+@Mixin(ThrownTrident.class)
 public abstract class TridentChannelingMixin {
 
-    @Inject(
-            method = "onBlockHitEnchantmentEffects",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/enchantment/EnchantmentHelper;onHitBlock(" +
-                            "Lnet/minecraft/server/world/ServerWorld;" +
-                            "Lnet/minecraft/item/ItemStack;" +
-                            "Lnet/minecraft/entity/LivingEntity;" +
-                            "Lnet/minecraft/entity/Entity;" +
-                            "Lnet/minecraft/entity/EquipmentSlot;" +
-                            "Lnet/minecraft/util/math/Vec3d;" +
-                            "Lnet/minecraft/block/BlockState;" +
-                            "Ljava/util/function/Consumer;)V",
-                    shift = At.Shift.AFTER
-            )
-    )
-    private void trackChannelingLightning(ServerWorld world, BlockHitResult blockHitResult, ItemStack weaponStack, CallbackInfo ci) {
-        TridentEntity trident = (TridentEntity) (Object) this;
-        if (!(trident.getOwner() instanceof ServerPlayerEntity player) ||
-                !(trident.getOwner().getWorld() instanceof ServerWorld serverWorld)) return;
+    @Inject(method = "hitBlockEnchantmentEffects", at = @At("TAIL"))
+    private void trackChannelingLightning(ServerLevel level, BlockHitResult hitResult, ItemStack weapon, CallbackInfo ci) {
+        ThrownTrident trident = (ThrownTrident) (Object) this;
+        if (!(trident.getOwner() instanceof ServerPlayer player)) return;
 
-        RegistryEntry<Enchantment> channelingEntry =
-                world.getRegistryManager()
-                        .get(RegistryKeys.ENCHANTMENT)
-                        .getEntry(Enchantments.CHANNELING)
-                        .orElse(null);
+        Holder<Enchantment> channelingHolder = level.registryAccess()
+                .lookupOrThrow(Registries.ENCHANTMENT)
+                .getOrThrow(Enchantments.CHANNELING);
 
-        if (channelingEntry == null) return;
-
-        int level = EnchantmentHelper.getLevel(channelingEntry, weaponStack);
-
-        if (level > 0) {
-            WorldRegistry.get(serverWorld)
+        if (weapon.getEnchantments().getLevel(channelingHolder) > 0) {
+            WorldRegistry.get(level)
                     .getTrackerManager()
                     .getLightningOriginTracker()
-                    .record(trident, player.getUuid());
+                    .record(trident, player.getUUID());
         }
     }
 }

@@ -1,8 +1,8 @@
 package dev.slarrties.privit.client.gui.widget.icon;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 public class ItemIcon implements Icon {
     private final ItemStack stack;
@@ -13,21 +13,29 @@ public class ItemIcon implements Icon {
         this.size = size;
     }
 
-    public ItemIcon(ItemStack stack) { this(stack, 16); }
-
-    @Override
-    public void render(DrawContext context, int x, int y, int availableWidth, int availableHeight, boolean hovered, boolean active) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        context.drawItem(stack, x, y);
-        context.drawItemInSlot(client.textRenderer, stack, x, y);
+    public ItemIcon(ItemStack stack) {
+        this(stack, 16);
     }
 
     @Override
-    public int getWidth() { return size; }
+    public void render(GuiGraphicsExtractor graphics, int x, int y, int availableWidth, int availableHeight, boolean hovered, boolean active) {
+        Minecraft minecraft = Minecraft.getInstance();
+        graphics.item(stack, x, y);
+        graphics.itemDecorations(minecraft.font, stack, x, y);
+    }
 
     @Override
-    public int getHeight() { return size; }
+    public int getWidth() {
+        return size;
+    }
 
     @Override
-    public IconMode getMode() { return IconMode.FIXED_CENTER; }
+    public int getHeight() {
+        return size;
+    }
+
+    @Override
+    public IconMode getMode() {
+        return IconMode.FIXED_CENTER;
+    }
 }

@@ -3,26 +3,37 @@ package dev.slarrties.privit.common.registry;
 import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.common.block.RegionTableBlock;
 
-import net.minecraft.item.Item;
-import net.minecraft.block.Block;
-import net.minecraft.item.BlockItem;
-import net.minecraft.block.MapColor;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.Registries;
-import net.minecraft.block.AbstractBlock;
-import net.minecraft.sound.BlockSoundGroup;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.material.MapColor;
 
 public final class BlocksRegistry {
+
+    public static final ResourceKey<Block> REGION_TABLE_KEY = ResourceKey.create(Registries.BLOCK, PrivitMod.id("region_table"));
+    public static final ResourceKey<Item> REGION_TABLE_ITEM_KEY = ResourceKey.create(Registries.ITEM, PrivitMod.id("region_table"));
+
     public static final Block REGION_TABLE = new RegionTableBlock(
-            AbstractBlock.Settings.create()
-                    .mapColor(MapColor.IRON_GRAY)
+            BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
                     .strength(5.0f, 1200.0f)
-                    .sounds(BlockSoundGroup.METAL)
-                    .nonOpaque()
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+                    .setId(REGION_TABLE_KEY)
     );
 
     public static void register() {
-        Registry.register(Registries.BLOCK, PrivitMod.id("region_table"), REGION_TABLE);
-        Registry.register(Registries.ITEM, PrivitMod.id("region_table"), new BlockItem(REGION_TABLE, new Item.Settings()));
+        Registry.register(BuiltInRegistries.BLOCK, REGION_TABLE_KEY, REGION_TABLE);
+        Registry.register(
+                BuiltInRegistries.ITEM,
+                REGION_TABLE_ITEM_KEY,
+                new BlockItem(REGION_TABLE, new Item.Properties().setId(REGION_TABLE_ITEM_KEY))
+        );
     }
 }

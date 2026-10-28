@@ -12,10 +12,10 @@ import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
 
-import net.minecraft.text.Text;
-import net.minecraft.client.gui.screen.Screen;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.screens.Screen;
 
 import java.util.Set;
 import java.util.Locale;
@@ -31,7 +31,7 @@ public final class ClothConfigScreenFactory implements ConfigScreenFactory<Scree
 
         ConfigBuilder builder = ConfigBuilder.create()
                 .setParentScreen(parent)
-                .setTitle(Text.translatable("privit.config.title"))
+                .setTitle(Component.translatable("privit.config.title"))
                 .setSavingRunnable(ConfigManager::save);
 
         ConfigEntryBuilder entries = builder.entryBuilder();
@@ -45,43 +45,43 @@ public final class ClothConfigScreenFactory implements ConfigScreenFactory<Scree
     }
 
     private static void addHud(ConfigBuilder builder, ConfigEntryBuilder entries, PrivitConfig config) {
-        ConfigCategory hud = builder.getOrCreateCategory(Text.translatable("privit.config.category.hud"));
+        ConfigCategory hud = builder.getOrCreateCategory(Component.translatable("privit.config.category.hud"));
 
         hud.addEntry(entries.startEnumSelector(
-                        Text.translatable("privit.config.hud.region_name_position"),
+                        Component.translatable("privit.config.hud.region_name_position"),
                         HudSection.Position.class,
                         config.hud.regionNamePosition
                 )
                 .setDefaultValue(HudSection.Position.TOP_RIGHT)
-                .setTooltip(FormattedTooltipText.of(Text.translatable("privit.config.hud.region_name_position.tooltip")).text().toArray(Text[]::new))
-                .setSaveConsumer(value -> config.hud.regionNamePosition = value)
+                .setTooltip(FormattedTooltipText.of(Component.translatable("privit.config.hud.region_name_position.tooltip")).text().toArray(new Component[0]))
+                .setSaveConsumer((HudSection.Position value) -> config.hud.regionNamePosition = value)
                 .build());
     }
 
     private static void addLimits(ConfigBuilder builder, ConfigEntryBuilder entries, PrivitConfig config) {
-        ConfigCategory limits = builder.getOrCreateCategory(Text.translatable("privit.config.category.region_limits"));
+        ConfigCategory limits = builder.getOrCreateCategory(Component.translatable("privit.config.category.region_limits"));
 
         limits.addEntry(entries.startIntField(
-                        Text.translatable("privit.config.limits.max_area"),
+                        Component.translatable("privit.config.limits.max_area"),
                         config.regionLimits.maxArea
                 )
                 .setDefaultValue(128 * 64 * 128)
-                .setTooltip(FormattedTooltipText.of(Text.translatable("privit.config.limits.max_area.tooltip")).text().toArray(Text[]::new))
-                .setSaveConsumer(value -> config.regionLimits.maxArea = value)
+                .setTooltip(FormattedTooltipText.of(Component.translatable("privit.config.limits.max_area.tooltip")).text().toArray(new Component[0]))
+                .setSaveConsumer((Integer value) -> config.regionLimits.maxArea = value)
                 .build());
 
         limits.addEntry(entries.startIntField(
-                        Text.translatable("privit.config.limits.max_regions_per_player"),
+                        Component.translatable("privit.config.limits.max_regions_per_player"),
                         config.regionLimits.maxRegionsPerPlayer
                 )
                 .setDefaultValue(5)
-                .setTooltip(FormattedTooltipText.of(Text.translatable("privit.config.limits.max_regions_per_player.tooltip")).text().toArray(Text[]::new))
-                .setSaveConsumer(value -> config.regionLimits.maxRegionsPerPlayer = value)
+                .setTooltip(FormattedTooltipText.of(Component.translatable("privit.config.limits.max_regions_per_player.tooltip")).text().toArray(new Component[0]))
+                .setSaveConsumer((Integer value) -> config.regionLimits.maxRegionsPerPlayer = value)
                 .build());
     }
 
     private static void addDefaultRules(ConfigBuilder builder, ConfigEntryBuilder entries, PrivitConfig config) {
-        ConfigCategory category = builder.getOrCreateCategory(Text.translatable("privit.config.category.default_rules"));
+        ConfigCategory category = builder.getOrCreateCategory(Component.translatable("privit.config.category.default_rules"));
 
         for (Rule rule : Rule.values()) {
             if (rule == Rule.MANAGE) continue;
@@ -91,14 +91,14 @@ public final class ClothConfigScreenFactory implements ConfigScreenFactory<Scree
 
             category.addEntry(entries.startBooleanToggle(ruleName(key), current)
                     .setDefaultValue(false)
-                    .setTooltip(FormattedTooltipText.of(Text.translatable("privit.config.default_rules.tooltip")).text().toArray(Text[]::new))
-                    .setSaveConsumer(value -> config.defaultRules.rules.put(key, value))
+                    .setTooltip(FormattedTooltipText.of(Component.translatable("privit.config.default_rules.tooltip")).text().toArray(new Component[0]))
+                    .setSaveConsumer((Boolean value) -> config.defaultRules.rules.put(key, value))
                     .build());
         }
     }
 
     private static void addFrozenRules(ConfigBuilder builder, ConfigEntryBuilder entries, PrivitConfig config) {
-        ConfigCategory category = builder.getOrCreateCategory(Text.translatable("privit.config.category.frozen_rules"));
+        ConfigCategory category = builder.getOrCreateCategory(Component.translatable("privit.config.category.frozen_rules"));
 
         Set<String> frozen = new LinkedHashSet<>();
         for (String name : config.frozenRules.disabled) {
@@ -115,21 +115,20 @@ public final class ClothConfigScreenFactory implements ConfigScreenFactory<Scree
 
             category.addEntry(entries.startBooleanToggle(ruleName(key), current)
                     .setDefaultValue(false)
-                    .setTooltip(FormattedTooltipText.of(Text.translatable("privit.config.frozen_rules.tooltip")).text().toArray(Text[]::new))
-                    .setSaveConsumer(value -> {
+                    .setTooltip(FormattedTooltipText.of(Component.translatable("privit.config.frozen_rules.tooltip")).text().toArray(new Component[0]))
+                    .setSaveConsumer((Boolean value) -> {
                         if (value) {
                             frozen.add(key);
                         } else {
                             frozen.remove(key);
                         }
-
                         config.frozenRules.disabled = new ArrayList<>(frozen);
                     })
                     .build());
         }
     }
 
-    private static Text ruleName(String key) {
-        return Text.translatable("privit.config.rule." + key.toLowerCase(Locale.ROOT));
+    private static Component ruleName(String key) {
+        return Component.translatable("privit.config.rule." + key.toLowerCase(Locale.ROOT));
     }
 }

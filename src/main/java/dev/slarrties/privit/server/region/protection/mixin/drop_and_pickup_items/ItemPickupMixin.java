@@ -7,9 +7,9 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.PlayerPermissionCache;
 
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.item.ItemEntity;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,13 +20,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ItemEntity.class)
 public abstract class ItemPickupMixin {
 
-    @Inject(method = "onPlayerCollision", at = @At("HEAD"), cancellable = true)
-    private void preventItemPickup(PlayerEntity player, CallbackInfo ci) {
-        if (!(player instanceof ServerPlayerEntity serverPlayer)) return;
+    @Inject(method = "playerTouch", at = @At("HEAD"), cancellable = true)
+    private void preventItemPickup(Player player, CallbackInfo ci) {
+        if (!(player instanceof ServerPlayer serverPlayer)) return;
 
         ItemEntity itemEntity = (ItemEntity) (Object) this;
-        boolean allowed = PlayerPermissionCache.isAllowed(serverPlayer, Rule.DROP_AND_PICKUP_ITEMS, itemEntity.getBlockPos());
-
+        boolean allowed = PlayerPermissionCache.isAllowed(serverPlayer, Rule.DROP_AND_PICKUP_ITEMS, itemEntity.blockPosition());
         if (!allowed) {
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_ITEM_PICKUP, Color.RED);
             ci.cancel();

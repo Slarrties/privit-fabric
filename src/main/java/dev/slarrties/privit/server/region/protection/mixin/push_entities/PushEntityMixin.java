@@ -9,11 +9,11 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.vehicle.BoatEntity;
-import net.minecraft.entity.vehicle.AbstractMinecartEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.vehicle.boat.Boat;
+import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -24,25 +24,26 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Entity.class)
 public abstract class PushEntityMixin {
 
-    @Inject(method = "pushAwayFrom", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "Lnet/minecraft/world/entity/Entity;push(Lnet/minecraft/world/entity/Entity;)V", at = @At("HEAD"), cancellable = true)
     private void preventPlayerPushingEntities(Entity pusher, CallbackInfo ci) {
         Entity victim = (Entity) (Object) this;
+        if (victim.level().isClientSide()) return;
+        if (!(pusher instanceof ServerPlayer serverPlayer)) return;
+        if (victim instanceof Boat || victim instanceof AbstractMinecart) return;
 
-        if (victim.getWorld().isClient) return;
-        if (!(pusher instanceof ServerPlayerEntity serverPlayer)) return;
-        if (victim instanceof BoatEntity || victim instanceof AbstractMinecartEntity) return;
-
-        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.PUSH_ENTITIES, victim.getBlockPos());
-
+        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.PUSH_ENTITIES, victim.blockPosition(), serverPlayer.level());
         if (!allowed) {
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_PUSH_ENTITY, Color.RED);
-            victim.setVelocity(0.0, victim.getVelocity().y, 0.0);
+            victim.setDeltaMovement(0.0, victim.getDeltaMovement().y, 0.0);
             ci.cancel();
+            return;
         }
 
-        InfluencedEntityTracker tracker = WorldRegistry.get((ServerWorld) victim.getWorld())
-                .getTrackerManager()
-                .getInfluencedEntityTracker();
-        tracker.record(victim, serverPlayer.getUuid());
+        if (victim.level() instanceof ServerLevel serverLevel) {
+            InfluencedEntityTracker tracker = WorldRegistry.get(serverLevel)
+                    .getTrackerManager()
+                    .getInfluencedEntityTracker();
+            tracker.record(victim, serverPlayer.getUUID());
+        }
     }
 }

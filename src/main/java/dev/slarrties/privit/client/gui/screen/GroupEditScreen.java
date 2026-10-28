@@ -8,14 +8,15 @@ import dev.slarrties.privit.common.region.RegionGroups;
 import dev.slarrties.privit.common.region.RegionPlayerGroup;
 import dev.slarrties.privit.common.network.payload.c2s.RegionGuiUpdateC2SPacket;
 
-import net.minecraft.text.Text;
-import net.minecraft.item.Items;
-import net.minecraft.util.Identifier;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ButtonTextures;
+import net.minecraft.world.item.Items;
+import net.minecraft.resources.Identifier;
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.WidgetSprites;
+import net.minecraft.client.renderer.RenderPipelines;
 
 import java.util.Optional;
 
@@ -23,20 +24,21 @@ public class GroupEditScreen extends Screen {
 
     private static final int WIDTH = 180;
     private static final int HEIGHT = 90;
-    private static final Identifier ACCEPT_ICON = Identifier.of(PrivitMod.MOD_ID, "textures/gui/accept_changes_icon.png");
-    private static final Identifier CANCEL_ICON = Identifier.of(PrivitMod.MOD_ID, "textures/gui/delete_region_icon.png");
-    private static final Identifier BACKGROUND = Identifier.of(PrivitMod.MOD_ID, "textures/gui/region_gui_background.png");
 
-    private static final ButtonTextures STANDARD_BUTTON_BACKGROUND = new ButtonTextures(
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_bg_common.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_bg_common_pressed.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_bg_common_active.png")
+    private static final Identifier ACCEPT_ICON = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/accept_changes_icon.png");
+    private static final Identifier CANCEL_ICON = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/delete_region_icon.png");
+    private static final Identifier BACKGROUND = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/region_gui_background.png");
+
+    private static final WidgetSprites STANDARD_BUTTON_BACKGROUND = new WidgetSprites(
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_bg_common.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_bg_common_pressed.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_bg_common_active.png")
     );
 
-    private static final ButtonTextures WIDE_BUTTON_BACKGROUND = new ButtonTextures(
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common_pressed.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common_active.png")
+    private static final WidgetSprites WIDE_BUTTON_BACKGROUND = new WidgetSprites(
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common_pressed.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common_active.png")
     );
 
     private final RegionGuiController controller;
@@ -48,7 +50,7 @@ public class GroupEditScreen extends Screen {
     private GuiButton cancelButton;
 
     public GroupEditScreen(RegionGuiController controller, RegionPlayerGroup group) {
-        super(Text.translatable("privit.gui.group_edit.title"));
+        super(Component.translatable("privit.gui.group_edit.title"));
         this.controller = controller;
         this.originalGroup = new RegionPlayerGroup(group);
     }
@@ -67,70 +69,63 @@ public class GroupEditScreen extends Screen {
         int row1Y = bgY + TOP_MARGIN + 18;
         int nameFieldWidth = WIDTH - 2 * SIDE_MARGIN - 20 - 8;
 
-        nameField = new CustomTextField(textRenderer, bgX + SIDE_MARGIN, row1Y, nameFieldWidth, 20, Text.empty());
+        nameField = new CustomTextField(this.font, bgX + SIDE_MARGIN, row1Y, nameFieldWidth, 20, Component.empty());
         nameField.setMaxLength(16);
-        nameField.setText(originalGroup.getName());
+        nameField.setValue(originalGroup.getName());
         nameField.setCustomBackground(
-                Identifier.of(PrivitMod.MOD_ID, "textures/gui/text_field_bg.png"),
-                Identifier.of(PrivitMod.MOD_ID, "textures/gui/text_field_bg_active.png")
+                Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/text_field_bg.png"),
+                Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/text_field_bg_active.png")
         );
-        addDrawableChild(nameField);
+        addRenderableWidget(nameField);
 
-        deleteButton = new GuiButton.Builder(Text.empty(), btn -> deleteCurrentGroup())
+        deleteButton = new GuiButton.Builder(Component.empty(), btn -> deleteCurrentGroup())
                 .dimensions(bgX + WIDTH - SIDE_MARGIN - 20, row1Y, 20, 20)
                 .setBackground(STANDARD_BUTTON_BACKGROUND)
-                .icon(Items.BARRIER.getDefaultStack())
-                .tooltip(Tooltip.of(Text.translatable("privit.gui.group_edit.button.delete")))
+                .icon(Items.BARRIER.getDefaultInstance())
+                .tooltip(Tooltip.create(Component.translatable("privit.gui.group_edit.button.delete")))
                 .build();
-        addDrawableChild(deleteButton);
+        addRenderableWidget(deleteButton);
 
         int row2Y = row1Y + 20 + 12;
 
         acceptButton = new GuiButton.Builder(
-                Text.empty(),
+                Component.empty(),
                 btn -> renameCurrentGroup())
                 .dimensions(bgX + SIDE_MARGIN, row2Y, (WIDTH - 2 * SIDE_MARGIN - 8) / 2, 20)
                 .setBackground(WIDE_BUTTON_BACKGROUND)
                 .icon(ACCEPT_ICON, iconSize, iconSize, 0, -2)
-                .tooltip(Tooltip.of(Text.translatable("privit.gui.group_edit.button.accept")))
+                .tooltip(Tooltip.create(Component.translatable("privit.gui.group_edit.button.accept")))
                 .build();
-        addDrawableChild(acceptButton);
+        addRenderableWidget(acceptButton);
 
         cancelButton = new GuiButton.Builder(
-                Text.empty(),
+                Component.empty(),
                 btn -> closeScreen())
                 .dimensions(bgX + WIDTH - SIDE_MARGIN - (WIDTH - 2 * SIDE_MARGIN - 8) / 2, row2Y,
                         (WIDTH - 2 * SIDE_MARGIN - 8) / 2, 20)
                 .setBackground(WIDE_BUTTON_BACKGROUND)
                 .icon(CANCEL_ICON, iconSize, iconSize, 0, -2)
-                .tooltip(Tooltip.of(Text.translatable("privit.gui.group_edit.button.cancel")))
+                .tooltip(Tooltip.create(Component.translatable("privit.gui.group_edit.button.cancel")))
                 .build();
-        addDrawableChild(cancelButton);
+        addRenderableWidget(cancelButton);
 
-        nameField.setChangedListener(newText -> updateAcceptButtonState(newText.trim()));
-        updateAcceptButtonState(nameField.getText().trim());
+        nameField.setResponder(newText -> updateAcceptButtonState(newText.trim()));
+        updateAcceptButtonState(nameField.getValue().trim());
     }
-
-    // =====================================================================
-    //
-    // =====================================================================
 
     private void deleteCurrentGroup() {
         RegionGroups currentGroups = controller.getLocalState().groups();
-
         try {
             RegionGroups updatedGroups = currentGroups.removeGroup(originalGroup.getName());
             sendGroupsUpdate(updatedGroups);
         } catch (UnsupportedOperationException e) {
-            // Special groups cannot be deleted (owner / visitors)
+            // special groups cannot be deleted
         }
-
         closeScreen();
     }
 
     private void renameCurrentGroup() {
-        String newName = nameField.getText().trim();
-
+        String newName = nameField.getValue().trim();
         if (newName.isEmpty() || newName.equalsIgnoreCase(originalGroup.getName())) {
             closeScreen();
             return;
@@ -142,7 +137,7 @@ public class GroupEditScreen extends Screen {
             RegionGroups updatedGroups = currentGroups.renameGroup(originalGroup.getName(), newName);
             sendGroupsUpdate(updatedGroups);
         } catch (IllegalArgumentException | UnsupportedOperationException e) {
-            // Name is already taken or an attempt to rename the special group.
+            // invalid name
         }
 
         closeScreen();
@@ -152,7 +147,7 @@ public class GroupEditScreen extends Screen {
         RegionGuiUpdateC2SPacket packet = new RegionGuiUpdateC2SPacket(
                 controller.getLocalState().id(),
                 true,
-                MinecraftClient.getInstance().player.getName().getString(),
+                Minecraft.getInstance().player.getName().getString(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -162,69 +157,66 @@ public class GroupEditScreen extends Screen {
                 Optional.of(updatedGroups),
                 Optional.empty()
         );
-
         controller.sendUpdate(packet);
     }
 
     private void closeScreen() {
-        client.setScreen(new RegionScreen(controller, RegionScreen.Tab.PLAYER_GROUPS));
+        this.minecraft.setScreen(new RegionScreen(controller, RegionScreen.Tab.PLAYER_GROUPS));
     }
 
     private void updateAcceptButtonState(String newName) {
         if (newName.isEmpty()) {
             acceptButton.active = false;
-            acceptButton.setTooltip(Tooltip.of(Text.translatable("privit.gui.group_edit.button.accept.empty")));
+            acceptButton.setTooltip(Tooltip.create(Component.translatable("privit.gui.group_edit.button.accept.empty")));
             return;
         }
 
         if (RegionGroups.isNameForbidden(newName)) {
             acceptButton.active = false;
-            acceptButton.setTooltip(Tooltip.of(
-                    Text.translatable("privit.gui.group_edit.button.accept.forbidden", newName)
-            ));
+            acceptButton.setTooltip(Tooltip.create(Component.translatable("privit.gui.group_edit.button.accept.forbidden", newName)));
             return;
         }
 
         RegionGroups currentGroups = controller.getLocalState().groups();
-
         boolean isDuplicate = currentGroups.findByName(newName)
                 .map(g -> !g.getName().equalsIgnoreCase(originalGroup.getName()))
                 .orElse(false);
 
         if (isDuplicate) {
             acceptButton.active = false;
-            acceptButton.setTooltip(Tooltip.of(
-                    Text.translatable("privit.gui.group_edit.button.accept.duplicate", newName)
-            ));
+            acceptButton.setTooltip(Tooltip.create(Component.translatable("privit.gui.group_edit.button.accept.duplicate", newName)));
         } else {
             acceptButton.active = true;
-            acceptButton.setTooltip(Tooltip.of(Text.translatable("privit.gui.group_edit.button.accept", newName)));
+            acceptButton.setTooltip(Tooltip.create(Component.translatable("privit.gui.group_edit.button.accept", newName)));
         }
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
-        super.render(context, mouseX, mouseY, delta);
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+        this.extractBackground(graphics, mouseX, mouseY, delta);
+        super.extractRenderState(graphics, mouseX, mouseY, delta);
 
         int centerX = width / 2;
         int bgY = (height - HEIGHT) / 2;
 
-        context.drawCenteredTextWithShadow(textRenderer,
-                this.title,
-                centerX, bgY + 10, 0xFFFFFF);
+        graphics.centeredText(this.font, this.title, centerX, bgY + 10, 0xFFFFFFFF);
     }
 
     @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         int x = (width - WIDTH) / 2;
         int y = (height - HEIGHT) / 2;
-        context.fillGradient(0, 0, width, height, 0xC0101010, 0xD0101010);
-        context.drawTexture(BACKGROUND, x, y, 0, 0, WIDTH, HEIGHT, WIDTH, HEIGHT);
+
+        graphics.fillGradient(0, 0, width, height, 0xC0101010, 0xD0101010);
+        graphics.blit(
+                RenderPipelines.GUI_TEXTURED,
+                BACKGROUND,
+                x, y, 0, 0,
+                WIDTH, HEIGHT,
+                WIDTH, HEIGHT
+        );
     }
 
     @Override
-    public boolean shouldPause() {
-        return false;
-    }
+    public boolean isPauseScreen() { return false; }
 }

@@ -8,14 +8,15 @@ import dev.slarrties.privit.server.region.util.DamageResponsibilityChecker;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.util.Hand;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.decoration.ItemFrameEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.damagesource.DamageSource;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -25,38 +26,33 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.UUID;
 
 @AssociatedRule(Rule.BUILD)
-@Mixin(ItemFrameEntity.class)
+@Mixin(ItemFrame.class)
 public abstract class ItemFrameInteractMixin {
 
     @Inject(method = "interact", at = @At("HEAD"), cancellable = true)
-    private void preventInteract(PlayerEntity player, Hand hand, CallbackInfoReturnable<ActionResult> cir) {
-        if (!(player instanceof ServerPlayerEntity serverPlayer)) return;
+    private void preventInteract(Player player, InteractionHand hand, Vec3 location, CallbackInfoReturnable<InteractionResult> cir) {
+        if (!(player instanceof ServerPlayer serverPlayer)) return;
+        ItemFrame self = (ItemFrame) (Object) this;
+        BlockPos pos = self.blockPosition();
 
-        ItemFrameEntity self = (ItemFrameEntity) (Object) this;
-        BlockPos pos = self.getBlockPos();
-
-        if (!RegionPermissionChecker.isAllowed(serverPlayer.getUuid(), Rule.BUILD, pos, serverPlayer.getServerWorld())) {
-            cir.setReturnValue(ActionResult.FAIL);
+        if (!RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.BUILD, pos, serverPlayer.level())) {
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_BREAK_BLOCK, Color.RED);
+            cir.setReturnValue(InteractionResult.FAIL);
         }
     }
 
-    @Inject(method = "damage", at = @At("HEAD"), cancellable = true)
-    private void preventDamage(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        ItemFrameEntity self = (ItemFrameEntity) (Object) this;
-        if (self.getWorld().isClient()) return;
-
-        ServerWorld serverWorld = (ServerWorld) self.getWorld();
-        UUID responsible = DamageResponsibilityChecker.getResponsibleAttacker(source, serverWorld);
+    @Inject(method = "hurtServer", at = @At("HEAD"), cancellable = true)
+    private void preventDamage(ServerLevel serverLevel, DamageSource source, float damage, CallbackInfoReturnable<Boolean> cir) {
+        ItemFrame self = (ItemFrame) (Object) this;
+        UUID responsible = DamageResponsibilityChecker.getResponsibleAttacker(source, serverLevel);
         if (responsible == null) return;
 
-        BlockPos pos = self.getBlockPos();
-        if (!RegionPermissionChecker.isAllowed(responsible, Rule.BUILD, pos, serverWorld)) {
-            cir.setReturnValue(false);
-
-            if (source.getAttacker() instanceof ServerPlayerEntity serverPlayer) {
+        BlockPos pos = self.blockPosition();
+        if (!RegionPermissionChecker.isAllowed(responsible, Rule.BUILD, pos, serverLevel)) {
+            if (source.getEntity() instanceof ServerPlayer serverPlayer) {
                 PlayerNotification.trySend(serverPlayer, NotificationType.DENY_BREAK_BLOCK, Color.RED);
             }
+            cir.setReturnValue(false);
         }
     }
 }

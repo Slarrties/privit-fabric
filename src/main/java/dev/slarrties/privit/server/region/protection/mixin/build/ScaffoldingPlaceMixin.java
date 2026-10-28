@@ -9,10 +9,10 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.protection.BlockFallOriginTracker;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.item.ScaffoldingItem;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ScaffoldingBlockItem;
+import net.minecraft.world.item.context.BlockPlaceContext;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,27 +20,24 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @AssociatedRule({Rule.BUILD, Rule.CAUSE_BLOCK_FALL})
-@Mixin(ScaffoldingItem.class)
+@Mixin(ScaffoldingBlockItem.class)
 public abstract class ScaffoldingPlaceMixin {
 
-    @Inject(method = "getPlacementContext", at = @At("RETURN"), cancellable = true)
-    private void preventUnauthorizedScaffoldingPlace(ItemPlacementContext context,
-                                                     CallbackInfoReturnable<ItemPlacementContext> cir) {
-        ItemPlacementContext resolved = cir.getReturnValue();
-        if (resolved == null) return;
-        if (!(resolved.getPlayer() instanceof ServerPlayerEntity player)) return;
+    @Inject(method = "updatePlacementContext", at = @At("RETURN"), cancellable = true)
+    private void preventUnauthorizedScaffoldingPlace(BlockPlaceContext context, CallbackInfoReturnable<Boolean> cir) {
+        if (!cir.getReturnValue()) return;
+        if (!(context.getPlayer() instanceof ServerPlayer player)) return;
 
-        BlockPos placePos = resolved.getBlockPos();
-
-        if (!RegionPermissionChecker.isAllowed(player.getUuid(), Rule.BUILD, placePos, player.getServerWorld())) {
+        BlockPos placePos = context.getClickedPos();
+        if (!RegionPermissionChecker.isAllowed(player.getUUID(), Rule.BUILD, placePos, player.level())) {
             PlayerNotification.trySend(player, NotificationType.DENY_PLACE_BLOCK, Color.RED);
-            cir.setReturnValue(null);
+            cir.setReturnValue(false);
             return;
         }
 
-        BlockFallOriginTracker blockFallTracker = WorldRegistry.get(player.getServerWorld())
+        BlockFallOriginTracker blockFallTracker = WorldRegistry.get(player.level())
                 .getTrackerManager()
                 .getBlockFallOriginTracker();
-        blockFallTracker.record(placePos, player.getUuid());
+        blockFallTracker.record(placePos, player.getUUID());
     }
 }

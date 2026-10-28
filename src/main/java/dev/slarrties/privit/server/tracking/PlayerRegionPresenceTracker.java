@@ -5,10 +5,10 @@ import dev.slarrties.privit.server.region.Region;
 import dev.slarrties.privit.server.region.event.PlayerRegionChangeEvent;
 import dev.slarrties.privit.server.region.protection.PlayerPermissionCache;
 
-import net.minecraft.util.math.BlockBox;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 
@@ -18,52 +18,51 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class PlayerRegionPresenceTracker {
-
     private static final Map<UUID, Region> lastKnownRegion = new ConcurrentHashMap<>();
 
     private PlayerRegionPresenceTracker() {}
 
     public static void init() {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            ServerPlayerEntity player = handler.getPlayer();
+            ServerPlayer player = handler.getPlayer();
             PlayerPermissionCache.invalidatePlayer(player);
             server.submit(() -> checkPlayer(player));
         });
 
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-            UUID uuid = handler.getPlayer().getUuid();
+            UUID uuid = handler.getPlayer().getUUID();
             lastKnownRegion.remove(uuid);
             PlayerPermissionCache.invalidatePlayer(handler.getPlayer());
         });
 
         PlayerRegionChangeEvent.CHANGED.register(PlayerPermissionCache::onRegionChanged);
 
-        ServerTickEvents.END_WORLD_TICK.register(world -> {
-            if (world.getTime() % 5 != 0) return;
-
-            for (ServerPlayerEntity player : world.getPlayers()) {
+        ServerTickEvents.END_LEVEL_TICK.register(level -> {
+            if (level.getGameTime() % 5 != 0) return;
+            for (ServerPlayer player : level.players()) {
                 checkPlayer(player);
             }
         });
     }
 
-    public static void refreshPlayersHud(ServerWorld world, BlockBox bounds) {
-        if (world == null || bounds == null) return;
-        for (ServerPlayerEntity player : world.getPlayers()) {
-            if (bounds.contains(player.getBlockPos())) {
+    public static void refreshPlayersHud(ServerLevel level, BoundingBox bounds) {
+        if (level == null || bounds == null) return;
+
+        for (ServerPlayer player : level.players()) {
+            if (bounds.isInside(player.blockPosition())) {
                 checkPlayer(player);
             }
         }
     }
 
-    private static void checkPlayer(ServerPlayerEntity player) {
-        UUID uuid = player.getUuid();
-        BlockPos pos = player.getBlockPos();
-        Region current = WorldRegistry.get(player.getServerWorld())
+    private static void checkPlayer(ServerPlayer player) {
+        UUID uuid = player.getUUID();
+        BlockPos pos = player.blockPosition();
+        Region previous = lastKnownRegion.get(uuid);
+        Region current = WorldRegistry.get(player.level())
                 .getRegionManager()
                 .getAt(pos)
                 .orElse(null);
-        Region previous = lastKnownRegion.get(uuid);
 
         if (Objects.equals(previous, current)) return;
         if (current != null) {
@@ -75,8 +74,8 @@ public final class PlayerRegionPresenceTracker {
         PlayerRegionChangeEvent.CHANGED.invoker().onRegionChanged(player, previous, current);
     }
 
-    public static Region getCurrentRegion(ServerPlayerEntity player) {
-        return lastKnownRegion.get(player.getUuid());
+    public static Region getCurrentRegion(ServerPlayer player) {
+        return lastKnownRegion.get(player.getUUID());
     }
 
     public static Region getCurrentRegionById(UUID playerUuid) {

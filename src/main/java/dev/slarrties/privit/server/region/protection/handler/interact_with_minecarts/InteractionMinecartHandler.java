@@ -9,13 +9,13 @@ import dev.slarrties.privit.server.region.protection.PlayerPermissionCache;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.region.protection.handler.RuleEventHandler;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.MinecartItem;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.block.AbstractRailBlock;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.entity.vehicle.AbstractMinecartEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.MinecartItem;
+import net.minecraft.world.level.block.BaseRailBlock;
+import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
+import net.minecraft.server.level.ServerPlayer;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 
@@ -27,36 +27,32 @@ public final class InteractionMinecartHandler implements RuleEventHandler {
 
     @Override
     public void register() {
+        UseBlockCallback.EVENT.register((player, level, hand, hitResult) -> {
+            if (level.isClientSide()) return InteractionResult.PASS;
+            if (!(player instanceof ServerPlayer serverPlayer)) return InteractionResult.PASS;
 
-        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-            if (world.isClient) return ActionResult.PASS;
-            if (!(player instanceof ServerPlayerEntity serverPlayer)) return ActionResult.PASS;
-
-            ItemStack stack = serverPlayer.getStackInHand(hand);
-
-            if (!(stack.getItem() instanceof MinecartItem)) return ActionResult.PASS;
-            if (!(world.getBlockState(hitResult.getBlockPos()).getBlock() instanceof AbstractRailBlock)) return ActionResult.PASS;
+            ItemStack stack = serverPlayer.getItemInHand(hand);
+            if (!(stack.getItem() instanceof MinecartItem)) return InteractionResult.PASS;
+            if (!(level.getBlockState(hitResult.getBlockPos()).getBlock() instanceof BaseRailBlock)) return InteractionResult.PASS;
 
             boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_MINECARTS, hitResult.getBlockPos());
-            if (allowed) return ActionResult.PASS;
+            if (allowed) return InteractionResult.PASS;
 
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_MINECART, Color.RED);
-
-            return ActionResult.FAIL;
+            return InteractionResult.FAIL;
         });
 
-        UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
-            if (world.isClient) return ActionResult.PASS;
-            if (!(player instanceof ServerPlayerEntity serverPlayer)) return ActionResult.PASS;
-            if (!(entity instanceof AbstractMinecartEntity)) return ActionResult.PASS;
+        UseEntityCallback.EVENT.register((player, level, hand, entity, hitResult) -> {
+            if (level.isClientSide()) return InteractionResult.PASS;
+            if (!(player instanceof ServerPlayer serverPlayer)) return InteractionResult.PASS;
+            if (!(entity instanceof AbstractMinecart)) return InteractionResult.PASS;
 
-            BlockPos pos = entity.getBlockPos();
+            BlockPos pos = entity.blockPosition();
             boolean allowed = PlayerPermissionCache.isAllowed(serverPlayer, Rule.INTERACT_WITH_MINECARTS, pos);
-            if (allowed) return ActionResult.PASS;
+            if (allowed) return InteractionResult.PASS;
 
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_MINECART, Color.RED);
-
-            return ActionResult.FAIL;
+            return InteractionResult.FAIL;
         });
     }
 }

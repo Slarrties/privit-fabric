@@ -15,23 +15,22 @@ import dev.slarrties.privit.server.command.support.argument.PlayerIdentityResolv
 import dev.slarrties.privit.server.command.support.argument.PlayerIdentityArgument;
 import dev.slarrties.privit.server.command.support.permission.CommandPermissions;
 
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.CommandSourceStack;
 
 import java.util.List;
 import java.util.UUID;
 
 public final class RegionsCommand implements CommandModule, PlayerAccess, OperatorAccess {
-
     @Override
-    public void register(LiteralArgumentBuilder<ServerCommandSource> root) {
-        root.then(CommandManager.literal("regions")
+    public void register(LiteralArgumentBuilder<CommandSourceStack> root) {
+        root.then(Commands.literal("regions")
                 .executes(this::own)
                 .then(PlayerIdentityArgument.player("player")
-                        .requires(CommandPermissions::operator)
+                        .requires(CommandPermissions::canManage)
                         .executes(this::other)));
     }
 
@@ -43,48 +42,41 @@ public final class RegionsCommand implements CommandModule, PlayerAccess, Operat
         );
     }
 
-    private int own(CommandContext<ServerCommandSource> ctx) throws CommandSyntaxException {
-        ServerCommandSource source = ctx.getSource();
-        ServerPlayerEntity player = PlayerIdentityResolver.requirePlayer(source);
-
-        return sendList(source, player.getUuid(), player.getName().getString());
+    private int own(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSourceStack source = ctx.getSource();
+        ServerPlayer player = PlayerIdentityResolver.requirePlayer(source);
+        return sendList(source, player.getUUID(), player.getName().getString());
     }
 
-    private int other(CommandContext<ServerCommandSource> ctx) throws CommandSyntaxException {
-        ServerCommandSource source = ctx.getSource();
+    private int other(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSourceStack source = ctx.getSource();
         UUID uuid = PlayerIdentityArgument.getUuid(ctx, "player");
         String name = PlayerIdentityResolver.resolveName(uuid);
-
         return sendList(source, uuid, name);
     }
 
-    private int sendList(ServerCommandSource source, UUID playerUuid, String playerName) {
+    private int sendList(CommandSourceStack source, UUID playerUuid, String playerName) {
         List<RegionLookup.LocatedRegion> owned = RegionLookup.findOwned(source.getServer(), playerUuid);
-
         if (owned.isEmpty()) {
             return CommandFeedback.success(
-                    source, Text.translatable("privit.command.regions.empty", playerName)
+                    source, Component.translatable("privit.command.regions.empty", playerName)
             );
         }
-
-        CommandFeedback.info(source, Text.translatable("privit.command.regions.header", playerName).formatted(Formatting.GOLD));
-
+        CommandFeedback.info(source, Component.translatable("privit.command.regions.header", playerName).withStyle(ChatFormatting.GOLD));
         int index = 1;
         for (RegionLookup.LocatedRegion entry : owned) {
-            Text line = Text.literal(index + ". ")
-                    .formatted(Formatting.GRAY)
-                    .append(Text.literal(entry.region().name()).formatted(Formatting.WHITE))
-                    .append(Text.literal("  "))
-                    .append(Text.literal(CommandText.dimensionName(entry.world())).formatted(Formatting.DARK_GRAY))
-                    .append(Text.literal("  "))
+            Component line = Component.literal(index + ". ")
+                    .withStyle(ChatFormatting.GRAY)
+                    .append(Component.literal(entry.region().name()).withStyle(ChatFormatting.WHITE))
+                    .append(Component.literal("  "))
+                    .append(Component.literal(CommandText.dimensionName(entry.level())).withStyle(ChatFormatting.DARK_GRAY))
+                    .append(Component.literal("  "))
                     .append(CommandText.clickableBlockPos(entry.region().pivotPos()))
-                    .append(Text.literal("  "))
+                    .append(Component.literal("  "))
                     .append(CommandText.clickableUuid(entry.region().id()));
-
             CommandFeedback.info(source, line);
             index++;
         }
-
         return owned.size();
     }
 }

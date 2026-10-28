@@ -9,14 +9,18 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.passive.*;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.animal.allay.Allay;
+import net.minecraft.world.entity.animal.axolotl.Axolotl;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.npc.wanderingtrader.WanderingTrader;
+import net.minecraft.world.damagesource.DamageSource;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -30,64 +34,56 @@ import java.util.UUID;
 @Mixin(LivingEntity.class)
 public abstract class AttackPassiveMobMixin {
 
-    @Inject(method = "damage", at = @At("HEAD"), cancellable = true)
-    private void preventPassiveDamage(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+    @Inject(method = "hurtServer", at = @At("HEAD"), cancellable = true)
+    private void preventPassiveDamage(ServerLevel level, DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         LivingEntity target = (LivingEntity) (Object) this;
-
-        if (target.getWorld().isClient || !(target.getWorld() instanceof ServerWorld serverWorld)) return;
+        if (target.level().isClientSide()) return;
         if (!isPassive(target)) return;
 
-        UUID responsiblePlayerUuid = getResponsibleAttacker(source, (ServerWorld) target.getWorld());
+        UUID responsiblePlayerUuid = getResponsibleAttacker(source, level);
         if (responsiblePlayerUuid == null) return;
 
-        boolean allowed = RegionPermissionChecker.isAllowed(responsiblePlayerUuid, Rule.ATTACK_PASSIVE_MOBS, target.getBlockPos(), serverWorld);
-
+        boolean allowed = RegionPermissionChecker.isAllowed(responsiblePlayerUuid, Rule.ATTACK_PASSIVE_MOBS, target.blockPosition(), level);
         if (!allowed) {
             cir.setReturnValue(false);
-
-            if (source.getAttacker() instanceof ServerPlayerEntity serverPlayer) {
+            if (source.getDirectEntity() instanceof ServerPlayer serverPlayer) {
                 PlayerNotification.trySend(serverPlayer, NotificationType.DENY_ATTACK_PASSIVE_MOB, Color.RED);
             }
         }
     }
 
     @Unique
-    private UUID getResponsibleAttacker(DamageSource source, ServerWorld world) {
-        Entity attacker = source.getAttacker();
+    private UUID getResponsibleAttacker(DamageSource source, ServerLevel level) {
+        Entity attacker = source.getDirectEntity();
         if (attacker == null) return null;
+        if (attacker instanceof ServerPlayer player) return player.getUUID();
 
-        if (attacker instanceof ServerPlayerEntity player) {
-            return player.getUuid();
-        }
-
-        if (attacker instanceof MobEntity) {
-            InfluencedEntityTracker tracker = WorldRegistry.get(world)
+        if (attacker instanceof Mob mob) {
+            InfluencedEntityTracker tracker = WorldRegistry.get(level)
                     .getTrackerManager()
                     .getInfluencedEntityTracker();
-            return tracker.getResponsible(attacker);
+            return tracker.getResponsible(mob);
         }
 
-        if (attacker instanceof ProjectileEntity projectile) {
+        if (attacker instanceof Projectile projectile) {
             Entity owner = projectile.getOwner();
-
-            if (owner instanceof ServerPlayerEntity player) return player.getUuid();
-            if (owner instanceof MobEntity) {
-                InfluencedEntityTracker tracker = WorldRegistry.get(world)
+            if (owner instanceof ServerPlayer player) return player.getUUID();
+            if (owner instanceof Mob mob) {
+                InfluencedEntityTracker tracker = WorldRegistry.get(level)
                         .getTrackerManager()
                         .getInfluencedEntityTracker();
-                return tracker.getResponsible(owner);
+                return tracker.getResponsible(mob);
             }
         }
-
         return null;
     }
 
     @Unique
     private static boolean isPassive(LivingEntity entity) {
-        return entity instanceof AnimalEntity ||
-                entity instanceof VillagerEntity ||
-                entity instanceof AllayEntity ||
-                entity instanceof AxolotlEntity ||
-                entity instanceof WanderingTraderEntity;
+        return entity instanceof Animal ||
+                entity instanceof Villager ||
+                entity instanceof Allay ||
+                entity instanceof Axolotl ||
+                entity instanceof WanderingTrader;
     }
 }

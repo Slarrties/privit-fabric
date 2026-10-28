@@ -4,12 +4,13 @@ import dev.slarrties.privit.common.region.rule.Rule;
 import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 
-import net.minecraft.util.Hand;
-import net.minecraft.util.ActionResult;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.vehicle.FurnaceMinecartEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.vehicle.minecart.MinecartFurnace;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -17,18 +18,18 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @AssociatedRule(Rule.INTERACT_WITH_MINECARTS)
-@Mixin(FurnaceMinecartEntity.class)
+@Mixin(MinecartFurnace.class)
 public abstract class MinecartFuelingMixin {
 
     @Inject(method = "interact", at = @At("HEAD"))
-    private void recordFueler(PlayerEntity player, Hand hand, CallbackInfoReturnable<ActionResult> cir) {
+    private void recordFueler(Player player, InteractionHand hand, Vec3 location, CallbackInfoReturnable<InteractionResult> cir) {
         Entity minecart = (Entity) (Object) this;
 
-        if (minecart instanceof FurnaceMinecartEntity && minecart.getWorld() instanceof ServerWorld serverWorld) {
-            WorldRegistry.get(serverWorld)
+        if (minecart instanceof MinecartFurnace && minecart.level() instanceof ServerLevel serverLevel) {
+            WorldRegistry.get(serverLevel)
                     .getTrackerManager()
                     .getMinecartFuelTracker()
-                    .record(minecart, player.getUuid());
+                    .record(minecart, player.getUUID());
         }
     }
 }

@@ -9,37 +9,34 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.handler.RuleEventHandler;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.item.Items;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.TypedActionResult;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.server.level.ServerPlayer;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 
 @AssociatedRule(Rule.THROW_POTIONS)
-public class ThrowPotionHandler implements RuleEventHandler {
+public final class ThrowPotionHandler implements RuleEventHandler {
 
     @Override
-    public Rule getRule() {
-        return Rule.THROW_POTIONS;
-    }
+    public Rule getRule() { return Rule.THROW_POTIONS; }
 
     @Override
     public void register() {
-        UseItemCallback.EVENT.register((player, world, hand) -> {
-            if (world.isClient || !(player instanceof ServerPlayerEntity serverPlayer))
-                return TypedActionResult.pass(player.getStackInHand(hand));
+        UseItemCallback.EVENT.register((player, level, hand) -> {
+            if (level.isClientSide() || !(player instanceof ServerPlayer serverPlayer)) return InteractionResult.PASS;
 
-            ItemStack stack = player.getStackInHand(hand);
-            if (!stack.isOf(Items.SPLASH_POTION) && !stack.isOf(Items.LINGERING_POTION))
-                return TypedActionResult.pass(stack);
+            ItemStack stack = player.getItemInHand(hand);
+            if (!stack.is(Items.SPLASH_POTION) && !stack.is(Items.LINGERING_POTION)) return InteractionResult.PASS;
 
-            boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.THROW_POTIONS, player.getBlockPos());
-            if (allowed) return TypedActionResult.pass(stack);
+            BlockPos pos = player.blockPosition();
+            boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.THROW_POTIONS, pos);
+            if (allowed) return InteractionResult.PASS;
 
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_THROW_POTION, Color.RED);
             InventorySyncSystem.syncHandSlot(serverPlayer, hand);
-
-            return TypedActionResult.fail(stack);
+            return InteractionResult.FAIL;
         });
     }
 }

@@ -5,20 +5,19 @@ import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.nbt.RegionNbtPersistence;
 import dev.slarrties.privit.server.region.event.PlayerRegionChangeEvent;
 
-import net.minecraft.util.math.BlockBox;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
 import java.util.*;
 import org.jetbrains.annotations.Nullable;
 
 public final class RegionManager {
 
-    // switch to the sealed interface?
-    public record OpResult(NotificationType type, List<BlockBox> conflicts) {
-
+    // TODO: sealed interface
+    public record OpResult(NotificationType type, List<BoundingBox> conflicts) {
         public boolean isSuccess() {
             return type == NotificationType.REGION_CREATED
                     || type == NotificationType.REGION_UPDATED
@@ -29,20 +28,20 @@ public final class RegionManager {
             return new OpResult(type, List.of());
         }
 
-        public static OpResult failure(NotificationType type, List<BlockBox> conflicts) {
+        public static OpResult failure(NotificationType type, List<BoundingBox> conflicts) {
             return new OpResult(type, conflicts == null ? List.of() : List.copyOf(conflicts));
         }
     }
 
-    private final ServerWorld world;
+    private final ServerLevel level;
     private final RegionNbtPersistence regionStorage;
     private final Map<UUID, Region> regions = new HashMap<>();
     private final RegionSpatialIndex spatialIndex = new RegionSpatialIndex();
     private final RegionValidator validator;
 
-    public RegionManager(ServerWorld world) {
-        this.world = world;
-        this.regionStorage = new RegionNbtPersistence(world);
+    public RegionManager(ServerLevel level) {
+        this.level = level;
+        this.regionStorage = new RegionNbtPersistence(level);
         this.validator = new RegionValidator(this);
         regionStorage.load(this);
     }
@@ -53,27 +52,24 @@ public final class RegionManager {
         regionStorage.save(this);
     }
 
-    public OpResult tryCreate(Region candidate, ServerPlayerEntity actor) {
-        NotificationType type = validator.validateCreation(candidate, actor);
+    public OpResult tryCreate(Region candidate, ServerPlayer serverPlayer) {
+        NotificationType type = validator.validateCreation(candidate, serverPlayer);
         if (type != NotificationType.REGION_CREATED) {
             return toFailure(type, candidate, candidate.id());
         }
-
         regions.put(candidate.id(), candidate);
         spatialIndex.index(candidate);
         regionStorage.save(this);
         return OpResult.success(type);
     }
 
-    public OpResult tryUpdate(Region oldRegion, Region candidate, @Nullable ServerPlayerEntity actor) {
-        NotificationType type = validator.validateUpdate(oldRegion, candidate, actor);
-
+    public OpResult tryUpdate(Region oldRegion, Region candidate, @Nullable ServerPlayer serverPlayer) {
+        NotificationType type = validator.validateUpdate(oldRegion, candidate, serverPlayer);
         if (type != NotificationType.REGION_UPDATED) {
             return toFailure(type, candidate, oldRegion.id());
         } else if (!oldRegion.id().equals(candidate.id())) {
             return OpResult.failure(NotificationType.REGION_ID_CONFLICT, List.of());
         }
-
         spatialIndex.unindex(oldRegion);
         regions.put(candidate.id(), candidate);
         spatialIndex.index(candidate);
@@ -82,29 +78,26 @@ public final class RegionManager {
         boolean nameChanged = !oldRegion.name().equals(candidate.name());
         boolean colorChanged = !oldRegion.color().equals(candidate.color());
         if (nameChanged || colorChanged) {
-            world.getPlayers()
+            level.players()
                     .stream()
-                    .filter(p -> candidate.bounds().contains(p.getBlockPos()))
+                    .filter(p -> candidate.bounds().isInside(p.blockPosition()))
                     .forEach(p -> PlayerRegionChangeEvent.CHANGED.invoker()
                             .onRegionChanged(p, oldRegion, candidate));
         }
-
         return OpResult.success(NotificationType.REGION_UPDATED);
     }
 
-    public OpResult tryDelete(UUID regionId, @Nullable ServerPlayerEntity actor) {
+    public OpResult tryDelete(UUID regionId, @Nullable ServerPlayer serverPlayer) {
         Region region = regions.get(regionId);
         if (region == null) {
             return OpResult.failure(NotificationType.REGION_NOT_FOUND, List.of());
         }
-
-        if (actor != null) {
-            NotificationType type = validator.validateDeletion(region, actor);
+        if (serverPlayer != null) {
+            NotificationType type = validator.validateDeletion(region, serverPlayer);
             if (type != NotificationType.REGION_DELETED) {
                 return OpResult.failure(type, List.of());
             }
         }
-
         regions.remove(regionId);
         spatialIndex.unindex(region);
         regionStorage.save(this);
@@ -117,12 +110,13 @@ public final class RegionManager {
     }
 
     public Optional<Region> getAt(BlockPos pos) {
-        Set<UUID> ids = spatialIndex.getRegionIdsInChunk(new ChunkPos(pos).toLong());
+        long chunkKey = ChunkPos.pack(pos);
+        Set<UUID> ids = spatialIndex.getRegionIdsInChunk(chunkKey);
         if (ids.isEmpty()) return Optional.empty();
 
         for (UUID id : ids) {
             Region region = regions.get(id);
-            if (region != null && region.bounds().contains(pos)) {
+            if (region != null && region.bounds().isInside(pos)) {
                 return Optional.of(region);
             }
         }
@@ -151,14 +145,11 @@ public final class RegionManager {
         return count;
     }
 
-    // violation of the single responsibility
     public int countOwnedByOnServer(UUID playerUuid) {
         int total = 0;
-
-        for (ServerWorld other : world.getServer().getWorlds()) {
+        for (ServerLevel other : level.getServer().getAllLevels()) {
             total += WorldRegistry.get(other).getRegionManager().countOwnedBy(playerUuid);
         }
-
         return total;
     }
 
@@ -173,7 +164,7 @@ public final class RegionManager {
                 .anyMatch(existing -> existing.bounds().intersects(candidate.bounds()));
     }
 
-    public List<BlockBox> computeConflictBounds(BlockBox candidateBounds, UUID ignoreRegionId) {
+    public List<BoundingBox> computeConflictBounds(BoundingBox candidateBounds, UUID ignoreRegionId) {
         return spatialIndex.computeConflictBounds(candidateBounds, ignoreRegionId, regions);
     }
 
@@ -185,8 +176,7 @@ public final class RegionManager {
         if (type != NotificationType.REGION_TERRITORY_CONFLICT) {
             return OpResult.failure(type, List.of());
         }
-
-        BlockBox bounds = candidate != null ? candidate.bounds() : null;
+        BoundingBox bounds = candidate != null ? candidate.bounds() : null;
         return OpResult.failure(type, computeConflictBounds(bounds, ignoreId));
     }
 }

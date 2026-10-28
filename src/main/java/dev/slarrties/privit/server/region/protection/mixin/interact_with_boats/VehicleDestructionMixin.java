@@ -3,11 +3,11 @@ package dev.slarrties.privit.server.region.protection.mixin.interact_with_boats;
 import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.vehicle.VehicleEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.vehicle.VehicleEntity;
+import net.minecraft.world.damagesource.DamageSource;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -19,40 +19,38 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class VehicleDestructionMixin {
 
     @Inject(
-            method = "damage",
+            method = "hurtServer",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/entity/vehicle/VehicleEntity;killAndDropSelf(Lnet/minecraft/entity/damage/DamageSource;)V"
+                    target = "Lnet/minecraft/world/entity/vehicle/VehicleEntity;destroy(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/damagesource/DamageSource;)V"
             )
     )
-    private void onKillAndDropSelf(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        recordPassengersOnDestruction(source);
+    private void onKillAndDropSelf(ServerLevel level, DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+        recordPassengersOnDestruction(level, source);
     }
 
     @Inject(
-            method = "damage",
+            method = "hurtServer",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/entity/vehicle/VehicleEntity;discard()V"
+                    target = "Lnet/minecraft/world/entity/vehicle/VehicleEntity;discard()V"
             )
     )
-    private void onDiscard(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        recordPassengersOnDestruction(source);
+    private void onDiscard(ServerLevel level, DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+        recordPassengersOnDestruction(level, source);
     }
 
     @Unique
-    private void recordPassengersOnDestruction(DamageSource source) {
+    private void recordPassengersOnDestruction(ServerLevel level, DamageSource source) {
+        if (!(source.getEntity() instanceof ServerPlayer attacker)) return;
+
         VehicleEntity vehicle = (VehicleEntity) (Object) this;
-
-        if (!(vehicle.getWorld() instanceof ServerWorld serverWorld)) return;
-        if (!(source.getAttacker() instanceof ServerPlayerEntity attacker)) return;
-
-        InfluencedEntityTracker entityTracker = WorldRegistry.get(serverWorld)
+        InfluencedEntityTracker entityTracker = WorldRegistry.get(level)
                 .getTrackerManager()
                 .getInfluencedEntityTracker();
 
-        for (Entity passenger : vehicle.getPassengerList()) {
-            entityTracker.record(passenger, attacker.getUuid());
+        for (Entity passenger : vehicle.getPassengers()) {
+            entityTracker.record(passenger, attacker.getUUID());
         }
     }
 }

@@ -7,12 +7,12 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.projectile.thrown.EnderPearlEntity;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownEnderpearl;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,21 +20,21 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @AssociatedRule(Rule.THROW_ENDER_PEARLS)
-@Mixin(EnderPearlEntity.class)
+@Mixin(ThrownEnderpearl.class)
 public abstract class ThrowEnderPearlMixin {
 
-    @Inject(method = "onCollision", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "onHit", at = @At("HEAD"), cancellable = true)
     private void cancelTeleportInProtectedRegion(HitResult hitResult, CallbackInfo ci) {
-        EnderPearlEntity pearl = (EnderPearlEntity) (Object) this;
-        if (pearl.getWorld().isClient) return;
+        ThrownEnderpearl pearl = (ThrownEnderpearl) (Object) this;
+        if (pearl.level().isClientSide()) return;
 
         Entity owner = pearl.getOwner();
-        if (!(owner instanceof ServerPlayerEntity serverPlayer)) return;
+        if (!(owner instanceof ServerPlayer serverPlayer)) return;
 
-        Vec3d landingPos = hitResult.getPos();
-        BlockPos landingBlockPos = BlockPos.ofFloored(landingPos);
-        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.THROW_ENDER_PEARLS, landingBlockPos);
+        Vec3 landingPos = hitResult.getLocation();
+        BlockPos landingBlockPos = BlockPos.containing(landingPos);
 
+        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.THROW_ENDER_PEARLS, landingBlockPos, serverPlayer.level());
         if (!allowed) {
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_THROW_ENDER_PEARL, Color.RED);
             pearl.discard();

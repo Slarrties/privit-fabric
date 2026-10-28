@@ -8,14 +8,14 @@ import dev.slarrties.privit.server.region.util.InventorySyncSystem;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.world.World;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.ChestBlock;
-import net.minecraft.block.enums.ChestType;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.ChestType;
+import net.minecraft.world.item.context.BlockPlaceContext;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -27,16 +27,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(ChestBlock.class)
 public abstract class ChestPlacementMixin {
 
-    @Inject(method = "getPlacementState", at = @At("HEAD"), cancellable = true)
-    private void preventIllegalDoubleChest(ItemPlacementContext context, CallbackInfoReturnable<BlockState> cir) {
-        World world = context.getWorld();
-        if (world.isClient || !(context.getPlayer() instanceof ServerPlayerEntity serverPlayer)) return;
+    @Inject(method = "getStateForPlacement", at = @At("HEAD"), cancellable = true)
+    private void preventIllegalDoubleChest(BlockPlaceContext context, CallbackInfoReturnable<BlockState> cir) {
+        Level level = context.getLevel();
+        if (level.isClientSide() || !(context.getPlayer() instanceof ServerPlayer serverPlayer)) return;
 
-        BlockPos newChestPos = context.getBlockPos();
-        BlockState newChestState = ((ChestBlock) (Object) this).getDefaultState()
-                .with(ChestBlock.FACING, context.getHorizontalPlayerFacing().getOpposite());
+        BlockPos newChestPos = context.getClickedPos();
+        BlockState newChestState = ((ChestBlock) (Object) this).defaultBlockState()
+                .setValue(ChestBlock.FACING, context.getHorizontalDirection().getOpposite());
 
-        boolean shouldBlock = willFormDoubleChestWithProtectedChest(world, newChestPos, newChestState, serverPlayer);
+        boolean shouldBlock = willFormDoubleChestWithProtectedChest(level, newChestPos, newChestState, serverPlayer);
+
         if (shouldBlock) {
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_CONTAINER, Color.RED);
             InventorySyncSystem.syncHandSlot(serverPlayer, context.getHand());
@@ -45,18 +46,18 @@ public abstract class ChestPlacementMixin {
     }
 
     @Unique
-    private boolean willFormDoubleChestWithProtectedChest(World world, BlockPos newChestPos, BlockState newChestState, ServerPlayerEntity player) {
-        Direction facing = newChestState.get(ChestBlock.FACING);
+    private boolean willFormDoubleChestWithProtectedChest(Level level, BlockPos newChestPos, BlockState newChestState, ServerPlayer serverPlayer) {
+        Direction facing = newChestState.getValue(ChestBlock.FACING);
 
-        for (Direction dir : new Direction[]{facing.rotateYClockwise(), facing.rotateYCounterclockwise()}) {
-            BlockPos neighborPos = newChestPos.offset(dir);
-            BlockState neighborState = world.getBlockState(neighborPos);
+        for (Direction dir : new Direction[]{facing.getClockWise(), facing.getCounterClockWise()}) {
+            BlockPos neighborPos = newChestPos.relative(dir);
+            BlockState neighborState = level.getBlockState(neighborPos);
 
             if (neighborState.getBlock() instanceof ChestBlock &&
-                    neighborState.get(ChestBlock.FACING) == facing &&
-                    neighborState.get(ChestBlock.CHEST_TYPE) == ChestType.SINGLE) {
+                    neighborState.getValue(ChestBlock.FACING) == facing &&
+                    neighborState.getValue(ChestBlock.TYPE) == ChestType.SINGLE) {
 
-                boolean allowed = RegionPermissionChecker.isAllowed(player, Rule.INTERACT_WITH_CONTAINERS, neighborPos);
+                boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.INTERACT_WITH_CONTAINERS, neighborPos, serverPlayer.level());
                 if (!allowed) return true;
             }
         }

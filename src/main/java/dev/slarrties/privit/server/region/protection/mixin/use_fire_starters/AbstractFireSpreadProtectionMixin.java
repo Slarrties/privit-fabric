@@ -5,12 +5,12 @@ import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.tracking.protection.FireOriginTracker;
 
-import net.minecraft.world.World;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.AbstractFireBlock;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BaseFireBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.entity.player.Player;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -20,29 +20,29 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @AssociatedRule(Rule.USE_FIRE_STARTERS)
-@Mixin(AbstractFireBlock.class)
+@Mixin(BaseFireBlock.class)
 public abstract class AbstractFireSpreadProtectionMixin {
 
     @Inject(
-            method = "onBlockAdded",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;removeBlock(Lnet/minecraft/util/math/BlockPos;Z)Z")
+            method = "onPlace",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;removeBlock(Lnet/minecraft/core/BlockPos;Z)Z")
     )
-    private void cleanupOnInvalidPlacement(BlockState state, World world, BlockPos pos, BlockState oldState, boolean notify, CallbackInfo ci) {
-        if(world instanceof ServerWorld serverWorld) {
-            this.removeFromTracker(serverWorld, pos);
+    private void cleanupOnInvalidPlacement(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean notify, CallbackInfo ci) {
+        if (level instanceof ServerLevel serverLevel) {
+            this.removeFromTracker(serverLevel, pos);
         }
     }
 
-    @Inject(method = "onBreak", at = @At("HEAD"))
-    private void onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player, CallbackInfoReturnable<BlockState> cir) {
-        if(world instanceof ServerWorld serverWorld) {
-            this.removeFromTracker(serverWorld, pos);
+    @Inject(method = "playerWillDestroy", at = @At("HEAD"))
+    private void onBreak(Level level, BlockPos pos, BlockState state, Player player, CallbackInfoReturnable<BlockState> cir) {
+        if (level instanceof ServerLevel serverLevel) {
+            this.removeFromTracker(serverLevel, pos);
         }
     }
 
     @Unique
-    private void removeFromTracker(ServerWorld world, BlockPos pos) {
-        FireOriginTracker fireTracker = WorldRegistry.get(world).getTrackerManager().getFireOriginTracker();
+    private void removeFromTracker(ServerLevel level, BlockPos pos) {
+        FireOriginTracker fireTracker = WorldRegistry.get(level).getTrackerManager().getFireOriginTracker();
         fireTracker.remove(pos);
     }
 }

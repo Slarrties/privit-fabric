@@ -5,19 +5,19 @@ import dev.slarrties.privit.common.region.rule.Rule;
 import dev.slarrties.privit.common.notification.NotificationType;
 import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.util.PlayerNotification;
-import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
+import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.SpawnEggItem;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.SpawnEggItem;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -30,44 +30,42 @@ import java.util.Optional;
 @Mixin(SpawnEggItem.class)
 public abstract class SpawnEggUseOnEntityMixin {
 
-    @Inject(method = "spawnBaby", at = @At("HEAD"), cancellable = true)
-    private void preventSpawnEggOnProtectedEntity(
-            PlayerEntity user,
-            MobEntity entity,
-            EntityType<? extends MobEntity> entityType,
-            ServerWorld world,
-            Vec3d pos, ItemStack stack,
-            CallbackInfoReturnable<Optional<MobEntity>> cir
+    @Inject(method = "spawnOffspringFromSpawnEgg", at = @At("HEAD"), cancellable = true)
+    private static void preventSpawnEggOnProtectedEntity(
+            Player player,
+            Mob parent,
+            EntityType<? extends Mob> type,
+            ServerLevel level,
+            Vec3 pos, ItemStack spawnEggStack,
+            CallbackInfoReturnable<Optional<Mob>> cir
     ) {
-        if (!(user instanceof ServerPlayerEntity serverPlayer)) return;
+        if (!(player instanceof ServerPlayer serverPlayer)) return;
 
-        BlockPos spawnPos = BlockPos.ofFloored(pos);
-        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.USE_SPAWN_EGGS, spawnPos);
-
+        BlockPos spawnPos = BlockPos.containing(pos);
+        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.USE_SPAWN_EGGS, spawnPos, serverPlayer.level());
         if (!allowed) {
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_USE_SPAWN_EGG, Color.RED);
-            cir.setReturnValue(java.util.Optional.empty());
+            cir.setReturnValue(Optional.empty());
         }
     }
 
-    @Inject(method = "spawnBaby", at = @At("RETURN"))
-    private void recordSpawnedEntity(
-            PlayerEntity user,
-            MobEntity entity,
-            EntityType<? extends MobEntity> entityType,
-            ServerWorld world,
-            Vec3d pos, ItemStack stack,
-            CallbackInfoReturnable<Optional<MobEntity>> cir
+    @Inject(method = "spawnOffspringFromSpawnEgg", at = @At("RETURN"))
+    private static void recordSpawnedEntity(
+            Player player,
+            Mob parent,
+            EntityType<? extends Mob> type,
+            ServerLevel level,
+            Vec3 pos, ItemStack spawnEggStack,
+            CallbackInfoReturnable<Optional<Mob>> cir
     ) {
-        if (!(user instanceof ServerPlayerEntity player)) return;
-
-        Optional<MobEntity> result = cir.getReturnValue();
+        if (!(player instanceof ServerPlayer serverPlayer)) return;
+        Optional<Mob> result = cir.getReturnValue();
         if (result.isEmpty()) return;
 
-        MobEntity spawned = result.get();
-        InfluencedEntityTracker tracker = WorldRegistry.get(world)
+        Mob spawned = result.get();
+        InfluencedEntityTracker tracker = WorldRegistry.get(level)
                 .getTrackerManager()
                 .getInfluencedEntityTracker();
-        tracker.record(spawned, player.getUuid());
+        tracker.record(spawned, serverPlayer.getUUID());
     }
 }

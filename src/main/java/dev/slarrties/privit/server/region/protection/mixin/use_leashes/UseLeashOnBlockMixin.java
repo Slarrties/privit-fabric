@@ -7,12 +7,12 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.item.LeadItem;
-import net.minecraft.world.World;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.item.LeadItem;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerPlayer;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -23,13 +23,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(LeadItem.class)
 public abstract class UseLeashOnBlockMixin {
 
-    @Inject(method = "attachHeldMobsToBlock", at = @At("HEAD"), cancellable = true)
-    private static void preventAttachToBlock(PlayerEntity player, World world, BlockPos pos, CallbackInfoReturnable<ActionResult> cir) {
-        if (world.isClient()) return;
-        if (!(player instanceof ServerPlayerEntity serverPlayer)) return;
-        if (!RegionPermissionChecker.isAllowed(serverPlayer, Rule.USE_LEASHES, pos)) {
+    @Inject(method = "bindPlayerMobs", at = @At("HEAD"), cancellable = true)
+    private static void preventAttachToBlock(Player player, Level level, BlockPos pos, CallbackInfoReturnable<InteractionResult> cir) {
+        if (level.isClientSide()) return;
+        if (!(player instanceof ServerPlayer serverPlayer)) return;
+        if (!RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.USE_LEASHES, pos, serverPlayer.level())) {
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_USE_LEASH, Color.RED);
-            cir.setReturnValue(ActionResult.FAIL);
+            cir.setReturnValue(InteractionResult.FAIL);
         }
     }
 }

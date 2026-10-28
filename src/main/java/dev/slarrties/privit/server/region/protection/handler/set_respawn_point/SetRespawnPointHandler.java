@@ -9,13 +9,13 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.handler.RuleEventHandler;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.world.World;
-import net.minecraft.block.BedBlock;
-import net.minecraft.block.BlockState;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.block.RespawnAnchorBlock;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.RespawnAnchorBlock;
+import net.minecraft.server.level.ServerPlayer;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 
 @AssociatedRule(Rule.SET_RESPAWN_POINT)
@@ -26,34 +26,31 @@ public final class SetRespawnPointHandler implements RuleEventHandler {
 
     @Override
     public void register() {
-        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-            if (world.isClient || !(player instanceof ServerPlayerEntity serverPlayer)) return ActionResult.PASS;
+        UseBlockCallback.EVENT.register((player, level, hand, hitResult) -> {
+            if (level.isClientSide() || !(player instanceof ServerPlayer serverPlayer)) return InteractionResult.PASS;
 
             BlockPos pos = hitResult.getBlockPos();
-            BlockState state = world.getBlockState(pos);
+            BlockState state = level.getBlockState(pos);
 
             if (state.getBlock() instanceof BedBlock) {
-                if (world.getRegistryKey() != World.OVERWORLD) {
-                    return ActionResult.PASS;
+                if (level.dimension() != Level.OVERWORLD) {
+                    return InteractionResult.PASS;
                 }
             }
 
-            if (!isRespawnSettingBlock(state, world)) return ActionResult.PASS;
+            if (!isRespawnSettingBlock(state, level)) return InteractionResult.PASS;
 
             boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.SET_RESPAWN_POINT, pos);
-            if (allowed) return ActionResult.PASS;
+            if (allowed) return InteractionResult.PASS;
 
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_SET_RESPAWN_POINT, Color.RED);
             InventorySyncSystem.syncHandSlot(serverPlayer, hand);
-
-            return ActionResult.FAIL;
+            return InteractionResult.FAIL;
         });
     }
 
-    private static boolean isRespawnSettingBlock(BlockState state, World world) {
-        if (state.getBlock() instanceof BedBlock) {
-            return world.getRegistryKey() == World.OVERWORLD;
-        }
+    private static boolean isRespawnSettingBlock(BlockState state, Level level) {
+        if (state.getBlock() instanceof BedBlock) return level.dimension() == Level.OVERWORLD;
 
         return state.getBlock() instanceof RespawnAnchorBlock;
     }

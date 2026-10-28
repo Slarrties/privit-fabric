@@ -4,11 +4,11 @@ import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.common.region.Color;
 import dev.slarrties.privit.common.region.RegionGroups;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.BlockBox;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,45 +20,51 @@ public record RegionGuiUpdateS2CPacket(
         boolean isChanged,
         String editorName,
         Optional<String> name,
-        Optional<BlockBox> realBounds,
-        Optional<BlockBox> draftBounds,
-        Optional<List<BlockBox>> conflictBounds,
+        Optional<BoundingBox> realBounds,
+        Optional<BoundingBox> draftBounds,
+        Optional<List<BoundingBox>> conflictBounds,
         Optional<BlockPos> pivotPos,
         Optional<Color> color,
         Optional<RegionGroups> groups,
         Optional<Boolean> isCreated,
         Optional<Boolean> isAreaLimitExceeded
-) implements CustomPayload {
+) implements CustomPacketPayload {
 
-    public static final Id<RegionGuiUpdateS2CPacket> ID = new Id<>(PrivitMod.id("region_gui_update_s2c"));
-    public static final PacketCodec<PacketByteBuf, RegionGuiUpdateS2CPacket> CODEC =
-            PacketCodec.of(RegionGuiUpdateS2CPacket::write, RegionGuiUpdateS2CPacket::read);
+    public static final Type<RegionGuiUpdateS2CPacket> TYPE =
+            new Type<>(PrivitMod.id("region_gui_update_s2c"));
 
-    private void write(PacketByteBuf buf) {
-        buf.writeUuid(regionId);
+    public static final StreamCodec<FriendlyByteBuf, RegionGuiUpdateS2CPacket> CODEC =
+            StreamCodec.of(
+                    (buf, packet) -> packet.write(buf),
+                    RegionGuiUpdateS2CPacket::read
+            );
+
+    private void write(FriendlyByteBuf buf) {
+        buf.writeUUID(regionId);
         buf.writeBoolean(isChanged);
-        buf.writeString(editorName, 32);
+        buf.writeUtf(editorName, 32);
+
         buf.writeBoolean(name.isPresent());
-        name.ifPresent(n -> buf.writeString(n, 64));
+        name.ifPresent(n -> buf.writeUtf(n, 64));
 
         buf.writeBoolean(realBounds.isPresent());
         realBounds.ifPresent(b -> {
-            buf.writeInt(b.getMinX());
-            buf.writeInt(b.getMinY());
-            buf.writeInt(b.getMinZ());
-            buf.writeInt(b.getMaxX());
-            buf.writeInt(b.getMaxY());
-            buf.writeInt(b.getMaxZ());
+            buf.writeInt(b.minX());
+            buf.writeInt(b.minY());
+            buf.writeInt(b.minZ());
+            buf.writeInt(b.maxX());
+            buf.writeInt(b.maxY());
+            buf.writeInt(b.maxZ());
         });
 
         buf.writeBoolean(draftBounds.isPresent());
         draftBounds.ifPresent(b -> {
-            buf.writeInt(b.getMinX());
-            buf.writeInt(b.getMinY());
-            buf.writeInt(b.getMinZ());
-            buf.writeInt(b.getMaxX());
-            buf.writeInt(b.getMaxY());
-            buf.writeInt(b.getMaxZ());
+            buf.writeInt(b.minX());
+            buf.writeInt(b.minY());
+            buf.writeInt(b.minZ());
+            buf.writeInt(b.maxX());
+            buf.writeInt(b.maxY());
+            buf.writeInt(b.maxZ());
         });
 
         buf.writeBoolean(conflictBounds.isPresent());
@@ -68,7 +74,7 @@ public record RegionGuiUpdateS2CPacket(
         pivotPos.ifPresent(buf::writeBlockPos);
 
         buf.writeBoolean(color.isPresent());
-        color.ifPresent(c -> buf.writeString(c.getCode(), 16));
+        color.ifPresent(c -> buf.writeUtf(c.getCode(), 16));
 
         buf.writeBoolean(groups.isPresent());
         groups.ifPresent(g -> g.writeToBuf(buf));
@@ -80,27 +86,24 @@ public record RegionGuiUpdateS2CPacket(
         isAreaLimitExceeded.ifPresent(buf::writeBoolean);
     }
 
-    private static RegionGuiUpdateS2CPacket read(PacketByteBuf buf) {
-        UUID regionId = buf.readUuid();
+    private static RegionGuiUpdateS2CPacket read(FriendlyByteBuf buf) {
+        UUID regionId = buf.readUUID();
         boolean isChanged = buf.readBoolean();
-        String editorName = buf.readString(32);
-        Optional<String> name = buf.readBoolean() ?
-                Optional.of(buf.readString(64)) :
-                Optional.empty();
+        String editorName = buf.readUtf(32);
 
-        Optional<BlockBox> realBounds = buf.readBoolean()
-                ? Optional.of(BlockBox.create(
-                new BlockPos(buf.readInt(), buf.readInt(), buf.readInt()),
-                new BlockPos(buf.readInt(), buf.readInt(), buf.readInt())))
+        Optional<String> name = buf.readBoolean()
+                ? Optional.of(buf.readUtf(64))
                 : Optional.empty();
 
-        Optional<BlockBox> draftBounds = buf.readBoolean()
-                ? Optional.of(BlockBox.create(
-                new BlockPos(buf.readInt(), buf.readInt(), buf.readInt()),
-                new BlockPos(buf.readInt(), buf.readInt(), buf.readInt())))
+        Optional<BoundingBox> realBounds = buf.readBoolean()
+                ? Optional.of(readBox(buf))
                 : Optional.empty();
 
-        Optional<List<BlockBox>> conflictBounds = buf.readBoolean()
+        Optional<BoundingBox> draftBounds = buf.readBoolean()
+                ? Optional.of(readBox(buf))
+                : Optional.empty();
+
+        Optional<List<BoundingBox>> conflictBounds = buf.readBoolean()
                 ? Optional.of(readBoxList(buf))
                 : Optional.empty();
 
@@ -109,7 +112,7 @@ public record RegionGuiUpdateS2CPacket(
                 : Optional.empty();
 
         Optional<Color> color = buf.readBoolean()
-                ? Optional.of(Color.fromCode(buf.readString(16)))
+                ? Optional.of(Color.fromCode(buf.readUtf(16)))
                 : Optional.empty();
 
         Optional<RegionGroups> groups = buf.readBoolean()
@@ -125,49 +128,41 @@ public record RegionGuiUpdateS2CPacket(
                 : Optional.empty();
 
         return new RegionGuiUpdateS2CPacket(
-                regionId, isChanged, editorName, name, realBounds, draftBounds, conflictBounds, pivotPos, color, groups, isCreated, isAreaLimitExceeded
+                regionId, isChanged, editorName, name, realBounds, draftBounds,
+                conflictBounds, pivotPos, color, groups, isCreated, isAreaLimitExceeded
         );
     }
 
-    private static void writeBox(PacketByteBuf buf, BlockBox box) {
-        buf.writeInt(box.getMinX());
-        buf.writeInt(box.getMinY());
-        buf.writeInt(box.getMinZ());
-        buf.writeInt(box.getMaxX());
-        buf.writeInt(box.getMaxY());
-        buf.writeInt(box.getMaxZ());
+    private static BoundingBox readBox(FriendlyByteBuf buf) {
+        return new BoundingBox(
+                buf.readInt(), buf.readInt(), buf.readInt(),
+                buf.readInt(), buf.readInt(), buf.readInt()
+        );
     }
 
-    private static Optional<BlockBox> readOptionalBox(PacketByteBuf buf) {
-        return buf.readBoolean()
-                ? Optional.of(BlockBox.create(
-                        new BlockPos(buf.readInt(), buf.readInt(), buf.readInt()),
-                        new BlockPos(buf.readInt(), buf.readInt(), buf.readInt())
-                    ))
-                : Optional.empty();
-    }
-
-    private static void writeBoxList(PacketByteBuf buf, List<BlockBox> list) {
+    private static void writeBoxList(FriendlyByteBuf buf, List<BoundingBox> list) {
         buf.writeVarInt(list.size());
-        for (BlockBox box : list) {
-            writeBox(buf, box);
+        for (BoundingBox box : list) {
+            buf.writeInt(box.minX());
+            buf.writeInt(box.minY());
+            buf.writeInt(box.minZ());
+            buf.writeInt(box.maxX());
+            buf.writeInt(box.maxY());
+            buf.writeInt(box.maxZ());
         }
     }
 
-    private static List<BlockBox> readBoxList(PacketByteBuf buf) {
+    private static List<BoundingBox> readBoxList(FriendlyByteBuf buf) {
         int size = buf.readVarInt();
-        List<BlockBox> list = new ArrayList<>(size);
+        List<BoundingBox> list = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            list.add(BlockBox.create(
-                    new BlockPos(buf.readInt(), buf.readInt(), buf.readInt()),
-                    new BlockPos(buf.readInt(), buf.readInt(), buf.readInt())
-            ));
+            list.add(readBox(buf));
         }
         return list;
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

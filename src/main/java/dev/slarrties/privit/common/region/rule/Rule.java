@@ -1,6 +1,6 @@
 package dev.slarrties.privit.common.region.rule;
 
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 public enum Rule {
     MANAGE,
@@ -44,11 +44,11 @@ public enum Rule {
     TRIGGER_RAIDS,
     PUSH_ENTITIES;
 
-    public Text getName() {
-        return Text.translatable("privit.rule." + this.name().toLowerCase() + ".name");
+    public Component getName() {
+        return Component.translatable("privit.rule." + this.name().toLowerCase() + ".name");
     }
 
-    public Text getDescription() {
-        return Text.translatable("privit.rule." + this.name().toLowerCase() + ".description");
+    public Component getDescription() {
+        return Component.translatable("privit.rule." + this.name().toLowerCase() + ".description");
     }
 }

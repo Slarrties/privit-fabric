@@ -2,24 +2,19 @@ package dev.slarrties.privit.common.network.payload.c2s;
 
 import dev.slarrties.privit.PrivitMod;
 
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 import java.util.UUID;
 
-public record RegionGuiCancelC2SPacket(UUID regionId) implements CustomPayload {
-
-    public static final Id<RegionGuiCancelC2SPacket> ID = new Id<>(PrivitMod.id("region_gui_cancel_c2s"));
-    public static final PacketCodec<PacketByteBuf, RegionGuiCancelC2SPacket> CODEC =
-            PacketCodec.of(RegionGuiCancelC2SPacket::write, RegionGuiCancelC2SPacket::read);
-
-    private void write(PacketByteBuf buf) { buf.writeUuid(regionId); }
-
-    private static RegionGuiCancelC2SPacket read(PacketByteBuf buf) {
-        return new RegionGuiCancelC2SPacket(buf.readUuid());
-    }
+public record RegionGuiCancelC2SPacket(UUID regionId) implements CustomPacketPayload {
+    public static final Type<RegionGuiCancelC2SPacket> TYPE = new Type<>(PrivitMod.id("region_gui_cancel_c2s"));
+    public static final StreamCodec<FriendlyByteBuf, RegionGuiCancelC2SPacket> CODEC = StreamCodec.of(
+            (FriendlyByteBuf buf, RegionGuiCancelC2SPacket packet) -> buf.writeUUID(packet.regionId),
+            buf -> new RegionGuiCancelC2SPacket(buf.readUUID())
+    );
 
     @Override
-    public Id<? extends CustomPayload> getId() { return ID; }
+    public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

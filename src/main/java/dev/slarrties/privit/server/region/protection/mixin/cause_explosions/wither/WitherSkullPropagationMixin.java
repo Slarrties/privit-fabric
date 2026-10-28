@@ -5,12 +5,12 @@ import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.tracking.protection.ExplosionOriginTracker;
 
-import net.minecraft.world.World;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.boss.WitherEntity;
-import net.minecraft.entity.projectile.WitherSkullEntity;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.boss.wither.WitherBoss;
+import net.minecraft.world.entity.projectile.hurtingprojectile.WitherSkull;
+import net.minecraft.server.level.ServerLevel;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,25 +20,21 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.UUID;
 
 @AssociatedRule(Rule.CAUSE_EXPLOSIONS)
-@Mixin(WitherSkullEntity.class)
+@Mixin(WitherSkull.class)
 public abstract class WitherSkullPropagationMixin {
 
     @Inject(
-            method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/util/math/Vec3d;)V",
+            method = "<init>(Lnet/minecraft/world/level/Level;Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/phys/Vec3;)V",
             at = @At("TAIL")
     )
-    private void propagateFromWither(World world, LivingEntity owner, Vec3d velocity, CallbackInfo ci) {
-        WitherSkullEntity skull = (WitherSkullEntity) (Object) this;
-
-        if (owner instanceof WitherEntity wither && owner.getWorld() instanceof ServerWorld serverWorld) {
-            ExplosionOriginTracker explosionOriginTracker = WorldRegistry.get(serverWorld)
+    private void propagateFromWither(Level level, LivingEntity mob, Vec3 direction, CallbackInfo ci) {
+        WitherSkull skull = (WitherSkull) (Object) this;
+        if (skull.getOwner() instanceof WitherBoss wither && wither.level() instanceof ServerLevel serverLevel) {
+            ExplosionOriginTracker explosionOriginTracker = WorldRegistry.get(serverLevel)
                     .getTrackerManager()
                     .getExplosionOriginTracker();
-            UUID responsible = explosionOriginTracker.getResponsiblePlayer(wither);
-
-            if (responsible != null) {
-                explosionOriginTracker.record(skull, responsible);
-            }
+            UUID responsible = explosionOriginTracker.getResponsible(wither);
+            if (responsible != null) explosionOriginTracker.record(skull, responsible);
         }
     }
 }

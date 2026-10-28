@@ -1,23 +1,24 @@
 package dev.slarrties.privit.server.tracking.protection;
 
 import dev.slarrties.privit.server.tracking.origin.OriginTracker;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.server.world.ServerWorld;
+
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.HashMap;
 
 public class RaidOriginTracker implements OriginTracker {
 
-    private final ServerWorld world;
+    private final ServerLevel level;
     private final Map<Integer, UUID> raidOrigins = new HashMap<>();
 
-    public RaidOriginTracker(ServerWorld world) {
-        this.world = world;
+    public RaidOriginTracker(ServerLevel level) {
+        this.level = level;
     }
 
     public void record(int raidId, UUID playerUuid) {
@@ -50,14 +51,14 @@ public class RaidOriginTracker implements OriginTracker {
     }
 
     @Override
-    public NbtCompound toNbt() {
-        NbtCompound root = new NbtCompound();
-        NbtList list = new NbtList();
+    public CompoundTag toNbt() {
+        CompoundTag root = new CompoundTag();
+        ListTag list = new ListTag();
 
         for (Map.Entry<Integer, UUID> entry : raidOrigins.entrySet()) {
-            NbtCompound entryNbt = new NbtCompound();
+            CompoundTag entryNbt = new CompoundTag();
             entryNbt.putInt("RaidId", entry.getKey());
-            entryNbt.putUuid("PlayerId", entry.getValue());
+            entryNbt.putString("PlayerId", entry.getValue().toString());
             list.add(entryNbt);
         }
 
@@ -66,16 +67,21 @@ public class RaidOriginTracker implements OriginTracker {
     }
 
     @Override
-    public void fromNbt(NbtCompound nbt) {
+    public void fromNbt(CompoundTag nbt) {
         raidOrigins.clear();
-        if (!nbt.contains("Raids", NbtElement.LIST_TYPE)) return;
+        ListTag list = nbt.getListOrEmpty("Raids");
 
-        NbtList list = nbt.getList("Raids", NbtElement.COMPOUND_TYPE);
-        for (NbtElement element : list) {
-            NbtCompound entryNbt = (NbtCompound) element;
-            int raidId = entryNbt.getInt("RaidId");
-            UUID playerId = entryNbt.getUuid("PlayerId");
-            raidOrigins.put(raidId, playerId);
+        for (int i = 0; i < list.size(); i++) {
+            CompoundTag entryNbt = list.getCompound(i).orElseThrow();
+            int raidId = entryNbt.getIntOr("RaidId", -1);
+            String playerIdStr = entryNbt.getStringOr("PlayerId", "");
+
+            if (raidId != -1 && !playerIdStr.isEmpty()) {
+                try {
+                    UUID playerId = UUID.fromString(playerIdStr);
+                    raidOrigins.put(raidId, playerId);
+                } catch (IllegalArgumentException ignored) {}
+            }
         }
     }
 }

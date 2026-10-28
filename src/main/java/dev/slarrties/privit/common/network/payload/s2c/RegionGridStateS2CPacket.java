@@ -3,41 +3,40 @@ package dev.slarrties.privit.common.network.payload.s2c;
 import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.common.region.Color;
 
-import net.minecraft.util.math.BlockBox;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
+import java.util.Optional;
+import java.util.ArrayList;
 
 public record RegionGridStateS2CPacket(
         UUID regionId,
         boolean enabled,
         Optional<Color> color,
-        Optional<BlockBox> realBounds,
-        Optional<BlockBox> draftBounds,
-        List<BlockBox> conflictBounds
-) implements CustomPayload {
+        Optional<BoundingBox> realBounds,
+        Optional<BoundingBox> draftBounds,
+        List<BoundingBox> conflictBounds
+) implements CustomPacketPayload {
 
-    public static final Id<RegionGridStateS2CPacket> ID = new Id<>(PrivitMod.id("region_grid_state_s2c"));
+    public static final Type<RegionGridStateS2CPacket> TYPE = new Type<>(PrivitMod.id("region_grid_state_s2c"));
 
-    public static final PacketCodec<PacketByteBuf, RegionGridStateS2CPacket> CODEC = PacketCodec.of(
-            RegionGridStateS2CPacket::write,
+    public static final StreamCodec<FriendlyByteBuf, RegionGridStateS2CPacket> CODEC = StreamCodec.of(
+            (FriendlyByteBuf buf, RegionGridStateS2CPacket packet) -> packet.write(buf),
             RegionGridStateS2CPacket::read
     );
 
     public static RegionGridStateS2CPacket show(
             UUID regionId,
             Color color,
-            @Nullable BlockBox realBounds,
-            BlockBox draftBounds,
-            List<BlockBox> conflictBounds
+            @Nullable BoundingBox realBounds,
+            BoundingBox draftBounds,
+            List<BoundingBox> conflictBounds
     ) {
         return new RegionGridStateS2CPacket(
                 regionId,
@@ -60,37 +59,33 @@ public record RegionGridStateS2CPacket(
         );
     }
 
-    private void write(PacketByteBuf buf) {
-        buf.writeUuid(regionId);
+    private void write(FriendlyByteBuf buf) {
+        buf.writeUUID(regionId);
         buf.writeBoolean(enabled);
-
         if (!enabled) return;
 
-        buf.writeString(color.orElse(Color.getDefault()).getCode(), 16);
-
+        buf.writeUtf(color.orElse(Color.getDefault()).getCode(), 16);
         writeOptionalBox(buf, realBounds);
         writeBox(buf, draftBounds.orElseThrow());
-
         buf.writeVarInt(conflictBounds.size());
-        for (BlockBox box : conflictBounds) {
+        for (BoundingBox box : conflictBounds) {
             writeBox(buf, box);
         }
     }
 
-    private static RegionGridStateS2CPacket read(PacketByteBuf buf) {
-        UUID regionId = buf.readUuid();
+    private static RegionGridStateS2CPacket read(FriendlyByteBuf buf) {
+        UUID regionId = buf.readUUID();
         boolean enabled = buf.readBoolean();
 
         if (!enabled) {
             return hide(regionId);
         }
 
-        Color color = Color.fromCode(buf.readString(16));
-        Optional<BlockBox> realBounds = readOptionalBox(buf);
-        BlockBox draftBounds = readBox(buf);
-
+        Color color = Color.fromCode(buf.readUtf(16));
+        Optional<BoundingBox> realBounds = readOptionalBox(buf);
+        BoundingBox draftBounds = readBox(buf);
         int conflictCount = buf.readVarInt();
-        List<BlockBox> conflicts = new ArrayList<>(conflictCount);
+        List<BoundingBox> conflicts = new ArrayList<>(conflictCount);
         for (int i = 0; i < conflictCount; i++) {
             conflicts.add(readBox(buf));
         }
@@ -105,34 +100,34 @@ public record RegionGridStateS2CPacket(
         );
     }
 
-    private static void writeOptionalBox(PacketByteBuf buf, Optional<BlockBox> box) {
+    private static void writeOptionalBox(FriendlyByteBuf buf, Optional<BoundingBox> box) {
         buf.writeBoolean(box.isPresent());
-        box.ifPresent(value -> writeBox(buf, value));
+        box.ifPresent((BoundingBox value) -> writeBox(buf, value));
     }
 
-    private static Optional<BlockBox> readOptionalBox(PacketByteBuf buf) {
+    private static Optional<BoundingBox> readOptionalBox(FriendlyByteBuf buf) {
         if (!buf.readBoolean()) return Optional.empty();
         return Optional.of(readBox(buf));
     }
 
-    private static void writeBox(PacketByteBuf buf, BlockBox box) {
-        buf.writeInt(box.getMinX());
-        buf.writeInt(box.getMinY());
-        buf.writeInt(box.getMinZ());
-        buf.writeInt(box.getMaxX());
-        buf.writeInt(box.getMaxY());
-        buf.writeInt(box.getMaxZ());
+    private static void writeBox(FriendlyByteBuf buf, BoundingBox box) {
+        buf.writeInt(box.minX());
+        buf.writeInt(box.minY());
+        buf.writeInt(box.minZ());
+        buf.writeInt(box.maxX());
+        buf.writeInt(box.maxY());
+        buf.writeInt(box.maxZ());
     }
 
-    private static BlockBox readBox(PacketByteBuf buf) {
-        return BlockBox.create(
-                new BlockPos(buf.readInt(), buf.readInt(), buf.readInt()),
-                new BlockPos(buf.readInt(), buf.readInt(), buf.readInt())
+    private static BoundingBox readBox(FriendlyByteBuf buf) {
+        return new BoundingBox(
+                buf.readInt(), buf.readInt(), buf.readInt(),
+                buf.readInt(), buf.readInt(), buf.readInt()
         );
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

@@ -9,11 +9,10 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.tracking.protection.MinecartFuelTracker;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.entity.vehicle.FurnaceMinecartEntity;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.vehicle.minecart.MinecartFurnace;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -24,31 +23,32 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.UUID;
 
 @AssociatedRule(Rule.INTERACT_WITH_MINECARTS)
-@Mixin(FurnaceMinecartEntity.class)
+@Mixin(MinecartFurnace.class)
 public abstract class FurnaceMinecartProtectionMixin {
 
     @Shadow
     private int fuel;
 
-    @Inject(method = "moveOnRail", at = @At("HEAD"))
-    private void checkPoweredMinecartInRegion(BlockPos pos, BlockState state, CallbackInfo ci) {
-        FurnaceMinecartEntity minecart = (FurnaceMinecartEntity) (Object) this;
-
+    // TODO: tick head
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void checkPoweredMinecartInRegion(CallbackInfo ci) {
+        MinecartFurnace minecart = (MinecartFurnace) (Object) this;
         if (this.fuel <= 0) return;
-        if (minecart.getWorld() instanceof ServerWorld serverWorld) {
-            MinecartFuelTracker minecartFuelTracker = WorldRegistry.get(serverWorld).getTrackerManager().getMinecartFuelTracker();
-            UUID responsible = minecartFuelTracker.getResponsiblePlayer(minecart);
+
+        if (minecart.level() instanceof ServerLevel serverLevel) {
+            MinecartFuelTracker minecartFuelTracker = WorldRegistry.get(serverLevel)
+                    .getTrackerManager()
+                    .getMinecartFuelTracker();
+            UUID responsible = minecartFuelTracker.getResponsible(minecart);
             if (responsible == null) return;
 
-            BlockPos currentPos = minecart.getBlockPos();
-            boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_MINECARTS, currentPos, serverWorld);
-
+            BlockPos currentPos = minecart.blockPosition();
+            boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_MINECARTS, currentPos, serverLevel);
             if (!allowed) {
-                minecart.discard();
-                minecartFuelTracker.remove(minecart);
-
-                ServerPlayerEntity serverPlayer = serverWorld.getServer().getPlayerManager().getPlayer(responsible);
+                ServerPlayer serverPlayer = serverLevel.getServer().getPlayerList().getPlayer(responsible);
                 PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_MINECART, Color.RED);
+                minecartFuelTracker.remove(minecart);
+                minecart.discard();
             }
         }
     }

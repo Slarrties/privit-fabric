@@ -4,11 +4,11 @@ import dev.slarrties.privit.common.region.rule.Rule;
 import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.mob.GhastEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.monster.Ghast;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,21 +16,20 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @AssociatedRule(Rule.CAUSE_EXPLOSIONS)
-@Mixin(MobEntity.class)
+@Mixin(Mob.class)
 public abstract class GhastProvocationMixin {
 
-    @Inject(method = "setTarget(Lnet/minecraft/entity/LivingEntity;)V", at = @At("HEAD"))
+    @Inject(method = "setTarget(Lnet/minecraft/world/entity/LivingEntity;)V", at = @At("HEAD"))
     private void onMobTargetPlayer(LivingEntity target, CallbackInfo ci) {
-        MobEntity mob = (MobEntity) (Object) this;
+        Mob mob = (Mob) (Object) this;
+        if (!(target instanceof ServerPlayer serverPlayer)) return;
+        if (!(mob.level() instanceof ServerLevel serverLevel)) return;
 
-        if (!(target instanceof ServerPlayerEntity serverPlayer)) return;
-        if (!(mob.getWorld() instanceof ServerWorld serverWorld)) return;
+        var trackerManager = WorldRegistry.get(serverLevel).getTrackerManager();
+        trackerManager.getInfluencedEntityTracker().record(mob, serverPlayer.getUUID());
 
-        var trackerManager = WorldRegistry.get(serverWorld).getTrackerManager();
-        trackerManager.getInfluencedEntityTracker().record(mob, serverPlayer.getUuid());
-
-        if (mob instanceof GhastEntity) {
-            trackerManager.getExplosionOriginTracker().record(mob, serverPlayer.getUuid());
+        if (mob instanceof Ghast) {
+            trackerManager.getExplosionOriginTracker().record(mob, serverPlayer.getUUID());
         }
     }
 }

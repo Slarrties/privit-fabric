@@ -2,10 +2,10 @@ package dev.slarrties.privit.common.region;
 
 import dev.slarrties.privit.common.region.rule.RuleSettings;
 
-import net.minecraft.nbt.NbtList;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.FriendlyByteBuf;
 
 import java.util.*;
 
@@ -31,19 +31,16 @@ public final class RegionGroups {
 
     public static RegionGroups create(UUID ownerUuid) {
         Objects.requireNonNull(ownerUuid, "[RegionGroups] ownerUuid cannot be null");
-
         List<RegionPlayerGroup> initial = List.of(
                 new RegionPlayerGroup("owner", Set.of(ownerUuid), new RuleSettings("owner")),
                 new RegionPlayerGroup("visitors", Collections.emptySet(), new RuleSettings("visitors"))
         );
-
         return new RegionGroups(initial);
     }
 
     public static RegionGroups from(Collection<RegionPlayerGroup> groups) {
         if (groups == null || groups.isEmpty())
             throw new IllegalArgumentException("[RegionGroups::from] Groups collection cannot be null or empty");
-
         if (groups.size() > MAX_GROUPS)
             throw new IllegalArgumentException("[RegionGroups::from] Too many groups. " +
                     "Maximum allowed is " + MAX_GROUPS + ", got " + groups.size());
@@ -78,7 +75,6 @@ public final class RegionGroups {
 
         if (!hasOwner)
             throw new IllegalArgumentException("[RegionGroups::from] Owner group is required");
-
         if (!hasVisitors)
             validated.add(new RegionPlayerGroup("visitors", Collections.emptySet(), new RuleSettings("visitors")));
 
@@ -94,7 +90,6 @@ public final class RegionGroups {
 
     public Optional<RegionPlayerGroup> findByName(String name) {
         if (name == null) return Optional.empty();
-
         return groups.stream()
                 .filter(g -> g.getName().equalsIgnoreCase(name))
                 .findFirst();
@@ -102,16 +97,12 @@ public final class RegionGroups {
 
     public RegionGroups addGroup(RegionPlayerGroup group) {
         Objects.requireNonNull(group);
-
         if (isNameForbidden(group.getName()))
             throw new IllegalArgumentException("[RegionGroups::addGroup] Forbidden group name: " + group.getName());
-
         if (group.isOwnerGroup() || group.isVisitorsGroup())
             throw new UnsupportedOperationException("[RegionGroups::addGroup] Use withUpdatedGroup() to modify special groups");
-
         if (findByName(group.getName()).isPresent())
             throw new IllegalArgumentException("[RegionGroups::addGroup] Group with name '" + group.getName() + "' already exists");
-
         if (groups.size() >= MAX_GROUPS)
             throw new IllegalArgumentException("[RegionGroups::addGroup]  Cannot add more groups. " +
                     "Maximum number of groups per region is " + MAX_GROUPS + ".");
@@ -140,7 +131,6 @@ public final class RegionGroups {
         if (oldName == null || newName == null || newName.isBlank() || newName.length() > 32) return this;
         if (oldName.equalsIgnoreCase("owner") || oldName.equalsIgnoreCase("visitors"))
             throw new UnsupportedOperationException("Cannot rename special group: " + oldName);
-
         if (isNameForbidden(newName))
             throw new IllegalArgumentException("[RegionGroups::renameGroup] Forbidden group name: " + newName);
 
@@ -177,13 +167,12 @@ public final class RegionGroups {
         List<RegionPlayerGroup> newList = groups.stream()
                 .map(g -> g.getName().equalsIgnoreCase(groupName) ? new RegionPlayerGroup(updatedGroup) : g)
                 .toList();
-
         return new RegionGroups(newList);
     }
 
-    public NbtCompound toNbt() {
-        NbtCompound tag = new NbtCompound();
-        NbtList list = new NbtList();
+    public CompoundTag toNbt() {
+        CompoundTag tag = new CompoundTag();
+        ListTag list = new ListTag();
 
         for (RegionPlayerGroup group : groups)
             list.add(group.toNbt());
@@ -192,40 +181,41 @@ public final class RegionGroups {
         return tag;
     }
 
-    public static RegionGroups fromNbt(NbtCompound tag) {
-        if (tag == null || !tag.contains("groups", NbtElement.LIST_TYPE))
+    public static RegionGroups fromNbt(CompoundTag tag) {
+        if (tag == null || !tag.contains("groups"))
             throw new IllegalArgumentException("Invalid NBT for RegionGroups");
 
-        NbtList list = tag.getList("groups", NbtElement.COMPOUND_TYPE);
+        ListTag list = tag.getListOrEmpty("groups");
+        if (list.isEmpty())
+            throw new IllegalArgumentException("[RegionGroups::fromNbt] Empty groups list");
+
         List<RegionPlayerGroup> parsed = new ArrayList<>(list.size());
-
-        for (int i = 0; i < list.size(); i++)
-            parsed.add(RegionPlayerGroup.fromNbt(list.getCompound(i)));
-
+        for (var ref = new Object() {
+            int i = 0;
+        }; ref.i < list.size(); ref.i++) {
+            CompoundTag groupTag = list.getCompound(ref.i).orElseThrow(() -> new IllegalStateException("[RegionGroups::fromNbt] Group at index " + ref.i + " is not a CompoundTag"));
+            parsed.add(RegionPlayerGroup.fromNbt(groupTag));
+        }
         return from(parsed);
     }
 
-    public void writeToBuf(PacketByteBuf buf) {
+    public void writeToBuf(FriendlyByteBuf buf) {
         buf.writeVarInt(groups.size());
-
         for (RegionPlayerGroup group : groups) {
             group.writeToBuf(buf);
         }
     }
 
-    public static RegionGroups readFromBuf(PacketByteBuf buf) {
+    public static RegionGroups readFromBuf(FriendlyByteBuf buf) {
         int count = buf.readVarInt();
         List<RegionPlayerGroup> list = new ArrayList<>(count);
-
         for (int i = 0; i < count; i++)
             list.add(RegionPlayerGroup.readFromBuf(buf));
-
         return from(list);
     }
 
     private void validateNoDuplicateMembers() {
         Set<UUID> seen = new HashSet<>();
-
         for (RegionPlayerGroup group : groups) {
             for (UUID member : group.getMembers()) {
                 if (!seen.add(member)) {

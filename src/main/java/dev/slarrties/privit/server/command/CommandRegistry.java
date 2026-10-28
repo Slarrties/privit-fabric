@@ -8,17 +8,17 @@ import dev.slarrties.privit.server.command.support.help.HelpLine;
 import dev.slarrties.privit.server.command.support.CommandModule;
 import dev.slarrties.privit.server.command.support.feedback.CommandFeedback;
 
-import net.minecraft.text.Text;
-import net.minecraft.command.CommandRegistryAccess;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.command.CommandManager.RegistrationEnvironment;
+import net.minecraft.network.chat.Component;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands.CommandSelection;
 
 import java.util.List;
 
 public final class CommandRegistry {
-
     public static final String ROOT = "privit";
+
     private static final List<CommandModule> MODULES = List.of(
             new HelpCommand(),
             new ReloadCommand(),
@@ -31,22 +31,21 @@ public final class CommandRegistry {
 
     private CommandRegistry() {}
 
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher,
-                                CommandRegistryAccess registryAccess,
-                                RegistrationEnvironment environment) {
-
-        LiteralArgumentBuilder<ServerCommandSource> root = CommandManager.literal(ROOT);
-
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher,
+                                CommandBuildContext registryAccess,
+                                CommandSelection environment) {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal(ROOT);
         root.executes(ctx -> showHelp(ctx.getSource()));
 
-        for (CommandModule module : MODULES) module.register(root);
+        for (CommandModule module : MODULES) {
+            module.register(root);
+        }
 
         dispatcher.register(root);
     }
 
-    public static int showHelp(ServerCommandSource source) {
-        CommandFeedback.info(source, Text.translatable("privit.command.help.header"));
-
+    public static int showHelp(CommandSourceStack source) {
+        CommandFeedback.info(source, Component.translatable("privit.command.help.header"));
         for (CommandModule module : MODULES) {
             for (HelpLine line : module.helpLines()) {
                 if (line.visibleFor(source)) {

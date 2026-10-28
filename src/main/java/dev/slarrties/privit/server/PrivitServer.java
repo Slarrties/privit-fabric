@@ -16,10 +16,9 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
-
+import net.fabricmc.fabric.api.entity.event.v1.ServerEntityLevelChangeEvents;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
 public class PrivitServer implements DedicatedServerModInitializer {
 
@@ -38,23 +37,21 @@ public class PrivitServer implements DedicatedServerModInitializer {
         RegionHudService.init();
         WorldRegistry.init();
 
-        ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, origin, destination) -> {
+        ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register((player, origin, destination) -> {
             ServerPlayNetworking.send(player, new RegionGridClearS2CPacket());
         });
 
-        ServerEntityWorldChangeEvents.AFTER_ENTITY_CHANGE_WORLD.register(
-                (originalEntity, newEntity, originWorld, destinationWorld) -> {
-                    if (originWorld == destinationWorld) return;
-
-                    TrackerManager from = WorldRegistry.get(originWorld).getTrackerManager();
-                    TrackerManager to = WorldRegistry.get(destinationWorld).getTrackerManager();
-
+        ServerEntityLevelChangeEvents.AFTER_ENTITY_CHANGE_LEVEL.register(
+                (originalEntity, newEntity, originLevel, destinationLevel) -> {
+                    if (originLevel == destinationLevel) return;
+                    TrackerManager from = WorldRegistry.get(originLevel).getTrackerManager();
+                    TrackerManager to = WorldRegistry.get(destinationLevel).getTrackerManager();
                     from.transferEntity(originalEntity, newEntity, to);
                 }
         );
     }
 
-    private void onPlayerDisconnect(ServerPlayNetworkHandler handler, MinecraftServer server) {
+    private void onPlayerDisconnect(ServerGamePacketListenerImpl handler, MinecraftServer server) {
         PlayerNotification.clearForPlayer(handler.getPlayer());
     }
 }

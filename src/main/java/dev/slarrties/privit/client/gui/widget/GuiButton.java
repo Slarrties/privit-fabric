@@ -5,18 +5,20 @@ import dev.slarrties.privit.client.gui.widget.icon.IconMode;
 import dev.slarrties.privit.client.gui.widget.icon.ItemIcon;
 import dev.slarrties.privit.client.gui.widget.icon.TextureIcon;
 
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.item.ItemStack;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.screen.ButtonTextures;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.WidgetSprites;
+import net.minecraft.client.renderer.RenderPipelines;
 
 import org.jetbrains.annotations.Nullable;
 
-public class GuiButton extends ButtonWidget {
+public class GuiButton extends Button {
 
     public enum BackgroundMode {
         VANILLA,
@@ -24,18 +26,17 @@ public class GuiButton extends ButtonWidget {
         CUSTOM
     }
 
-    private static final ButtonTextures VANILLA_TEXTURES = new ButtonTextures(
-            Identifier.ofVanilla("widget/button"),
-            Identifier.ofVanilla("widget/button_disabled"),
-            Identifier.ofVanilla("widget/button_highlighted")
+    private static final WidgetSprites VANILLA_SPRITES = new WidgetSprites(
+            Identifier.withDefaultNamespace("widget/button"),
+            Identifier.withDefaultNamespace("widget/button_disabled"),
+            Identifier.withDefaultNamespace("widget/button_highlighted")
     );
 
-    public static final NarrationSupplier DEFAULT_NARRATION_SUPPLIER =
-            textSupplier -> (net.minecraft.text.MutableText) textSupplier.get();
+    public static final CreateNarration DEFAULT_NARRATION_SUPPLIER = textSupplier -> (MutableComponent) textSupplier.get();
 
     private Icon icon;
     private final BackgroundMode backgroundMode;
-    private final ButtonTextures backgroundTextures;
+    private final WidgetSprites backgroundSprites;
     private boolean toggleState = false;
     private final int iconPadding;
 
@@ -51,29 +52,28 @@ public class GuiButton extends ButtonWidget {
         );
         this.icon = builder.icon;
         this.backgroundMode = builder.backgroundMode;
-        this.backgroundTextures = builder.backgroundTextures;
+        this.backgroundSprites = builder.backgroundSprites;
         this.iconPadding = builder.iconPadding;
         super.setTooltip(builder.tooltip);
     }
 
     @Override
-    protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
-        MinecraftClient client = MinecraftClient.getInstance();
+    protected void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+        Minecraft minecraft = Minecraft.getInstance();
         boolean hasText = !this.getMessage().getString().isBlank();
 
         if (backgroundMode != BackgroundMode.NONE) {
             Identifier textureId;
-
-            if (backgroundMode == BackgroundMode.CUSTOM && backgroundTextures != null) {
+            if (backgroundMode == BackgroundMode.CUSTOM && backgroundSprites != null) {
                 if (!this.active) {
-                    textureId = backgroundTextures.disabled();
-                } else if (this.isHovered() || this.isSelected()) {
-                    textureId = backgroundTextures.enabledFocused();
+                    textureId = backgroundSprites.disabled();
+                } else if (this.isHovered() || this.isFocused()) {
+                    textureId = backgroundSprites.enabledFocused();
                 } else {
-                    textureId = backgroundTextures.enabled();
+                    textureId = backgroundSprites.enabled();
                 }
-
-                context.drawTexture(
+                graphics.blit(
+                        RenderPipelines.GUI_TEXTURED,
                         textureId,
                         this.getX(), this.getY(),
                         0, 0,
@@ -81,8 +81,9 @@ public class GuiButton extends ButtonWidget {
                         this.getWidth(), this.getHeight()
                 );
             } else {
-                textureId = VANILLA_TEXTURES.get(this.active, this.isSelected());
-                context.drawGuiTexture(
+                textureId = VANILLA_SPRITES.get(this.active, this.isFocused());
+                graphics.blitSprite(
+                        RenderPipelines.GUI_TEXTURED,
                         textureId,
                         this.getX(), this.getY(),
                         this.getWidth(), this.getHeight()
@@ -93,9 +94,8 @@ public class GuiButton extends ButtonWidget {
         if (icon != null) {
             int iconX = this.getX() + iconPadding;
             int iconY = this.getY() + (this.getHeight() - icon.getHeight()) / 2;
-
             icon.render(
-                    context,
+                    graphics,
                     iconX,
                     iconY,
                     this.getWidth() - iconPadding * 2,
@@ -107,19 +107,17 @@ public class GuiButton extends ButtonWidget {
 
         if (hasText) {
             int color = this.active ? 16777215 : 10526880;
-            int alpha = (int) (this.alpha * 255.0F) << 24;
-
-            int textX = this.getX() + (this.getWidth() - client.textRenderer.getWidth(this.getMessage())) / 2;
+            int alpha = (int) (this.getAlpha() * 255.0F) << 24;
+            int textX = this.getX() + (this.getWidth() - minecraft.font.width(this.getMessage())) / 2;
             int textY = this.getY() + (this.getHeight() - 10) / 2;
-
             if (icon != null) textX += icon.getWidth() + iconPadding;
-
-            context.drawTextWithShadow(
-                    client.textRenderer,
+            graphics.text(
+                    minecraft.font,
                     this.getMessage(),
                     textX,
                     textY,
-                    color | alpha
+                    color | alpha,
+                    true
             );
         }
     }
@@ -148,27 +146,21 @@ public class GuiButton extends ButtonWidget {
         return toggleState;
     }
 
-    // ===================================================================
-    // Builder
-    // ===================================================================
-
     public static class Builder {
-        private final Text message;
-        private final PressAction onPress;
-
+        private final Component message;
+        private final OnPress onPress;
         private int x = 0;
         private int y = 0;
         private int width = 150;
         private int height = 20;
-
-        private NarrationSupplier narrationSupplier = DEFAULT_NARRATION_SUPPLIER;
+        private CreateNarration narrationSupplier = DEFAULT_NARRATION_SUPPLIER;
         private BackgroundMode backgroundMode = BackgroundMode.VANILLA;
-        private ButtonTextures backgroundTextures;
+        private WidgetSprites backgroundSprites;
         private Tooltip tooltip;
         private Icon icon;
         private int iconPadding = 2;
 
-        public Builder(Text message, PressAction onPress) {
+        public Builder(Component message, OnPress onPress) {
             this.message = message;
             this.onPress = onPress;
         }
@@ -208,7 +200,7 @@ public class GuiButton extends ButtonWidget {
             return this;
         }
 
-        public Builder narration(NarrationSupplier supplier) {
+        public Builder narration(CreateNarration supplier) {
             this.narrationSupplier = supplier;
             return this;
         }
@@ -248,9 +240,9 @@ public class GuiButton extends ButtonWidget {
             return this;
         }
 
-        public Builder setBackground(ButtonTextures textures) {
+        public Builder setBackground(WidgetSprites sprites) {
             this.backgroundMode = BackgroundMode.CUSTOM;
-            this.backgroundTextures = textures;
+            this.backgroundSprites = sprites;
             return this;
         }
 

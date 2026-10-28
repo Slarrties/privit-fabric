@@ -2,29 +2,24 @@ package dev.slarrties.privit.common.network.payload.c2s;
 
 import dev.slarrties.privit.PrivitMod;
 
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 import java.util.UUID;
 
-public record RegionGridStateC2SPacket(UUID regionId, boolean enabled) implements CustomPayload {
-
-    public static final Id<RegionGridStateC2SPacket> ID = new Id<>(PrivitMod.id("region_grid_state_c2s"));
-
-    public static final PacketCodec<PacketByteBuf, RegionGridStateC2SPacket> CODEC = PacketCodec.of(
-            (value, buf) -> {
-                buf.writeUuid(value.regionId);
-                buf.writeBoolean(value.enabled);
+public record RegionGridStateC2SPacket(UUID regionId, boolean enabled) implements CustomPacketPayload {
+    public static final Type<RegionGridStateC2SPacket> TYPE = new Type<>(PrivitMod.id("region_grid_state_c2s"));
+    public static final StreamCodec<FriendlyByteBuf, RegionGridStateC2SPacket> CODEC = StreamCodec.of(
+            (FriendlyByteBuf buf, RegionGridStateC2SPacket packet) -> {
+                buf.writeUUID(packet.regionId);
+                buf.writeBoolean(packet.enabled);
             },
-            buf -> new RegionGridStateC2SPacket(
-                    buf.readUuid(),
-                    buf.readBoolean()
-            )
+            buf -> new RegionGridStateC2SPacket(buf.readUUID(), buf.readBoolean())
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

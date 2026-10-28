@@ -7,47 +7,54 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.world.World;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.ChorusFruitItem;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.consume_effects.TeleportRandomlyConsumeEffect;
 
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 
 @AssociatedRule(Rule.EAT_CHORUS_FRUITS)
-@Mixin(ChorusFruitItem.class)
+@Mixin(TeleportRandomlyConsumeEffect.class)
 public abstract class EatChorusFruitMixin {
 
-    @Inject(method = "finishUsing", at = @At("HEAD"), cancellable = true)
-    private void blockChorusTeleport(ItemStack stack, World world, LivingEntity user, CallbackInfoReturnable<ItemStack> cir) {
-        if (world.isClient || !(user instanceof ServerPlayerEntity serverPlayer)) return;
+    @Unique
+    private static final ThreadLocal<Boolean> HAS_NOTIFIED = ThreadLocal.withInitial(() -> false);
 
-        boolean blocked = false;
+    @Inject(method = "apply", at = @At("HEAD"))
+    private void resetNotificationFlag(Level level, ItemStack stack, LivingEntity user, CallbackInfoReturnable<Boolean> cir) {
+        HAS_NOTIFIED.set(false);
+    }
 
-        for (int i = 0; i < 16; ++i) {
-            double d = serverPlayer.getX() + (serverPlayer.getRandom().nextDouble() - 0.5) * 16.0;
-            double e = MathHelper.clamp(serverPlayer.getY() + (serverPlayer.getRandom().nextInt(16) - 8),
-                    world.getBottomY(), world.getBottomY() + ((ServerWorld)world).getLogicalHeight() - 1);
-            double f = serverPlayer.getZ() + (serverPlayer.getRandom().nextDouble() - 0.5) * 16.0;
-            BlockPos targetPos = BlockPos.ofFloored(d, e, f);
+    @WrapOperation(
+            method = "apply",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/world/entity/LivingEntity;randomTeleport(DDDZ)Z"
+            )
+    )
+    private boolean preventTeleportToProtectedRegion(LivingEntity user, double x, double y, double z, boolean particle, Operation<Boolean> original) {
+        if (user instanceof ServerPlayer serverPlayer && user.level() instanceof ServerLevel serverLevel) {
+            BlockPos targetPos = BlockPos.containing(x, y, z);
 
-            if (!RegionPermissionChecker.isAllowed(serverPlayer, Rule.EAT_CHORUS_FRUITS, targetPos)) {
-                blocked = true;
-                break;
+            if (!RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.EAT_CHORUS_FRUITS, targetPos, serverLevel)) {
+                if (!HAS_NOTIFIED.get()) {
+                    PlayerNotification.trySend(serverPlayer, NotificationType.DENY_EAT_CHORUS_FRUIT, Color.RED);
+                    HAS_NOTIFIED.set(true);
+                }
+                return false;
             }
         }
 
-        if (blocked) {
-            PlayerNotification.trySend(serverPlayer, NotificationType.DENY_EAT_CHORUS_FRUIT, Color.RED);
-            cir.setReturnValue(stack);
-            cir.cancel();
-        }
+        return original.call(user, x, y, z, particle);
     }
 }

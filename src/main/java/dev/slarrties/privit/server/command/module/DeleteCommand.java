@@ -15,21 +15,20 @@ import dev.slarrties.privit.server.command.support.feedback.CommandFeedback;
 import dev.slarrties.privit.server.command.support.argument.PlayerIdentityResolver;
 import dev.slarrties.privit.server.command.support.permission.CommandPermissions;
 
-import net.minecraft.text.Text;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.command.argument.UuidArgumentType;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.UuidArgument;
 
 import java.util.List;
 import java.util.UUID;
 
 public final class DeleteCommand implements CommandModule, PlayerAccess, OperatorAccess {
-
     @Override
-    public void register(LiteralArgumentBuilder<ServerCommandSource> root) {
-        root.then(CommandManager.literal("delete")
-                .then(CommandManager.argument("region", UuidArgumentType.uuid())
+    public void register(LiteralArgumentBuilder<CommandSourceStack> root) {
+        root.then(Commands.literal("delete")
+                .then(Commands.argument("region", UuidArgument.uuid())
                         .executes(this::delete)));
     }
 
@@ -40,27 +39,25 @@ public final class DeleteCommand implements CommandModule, PlayerAccess, Operato
         );
     }
 
-    private int delete(CommandContext<ServerCommandSource> ctx) throws CommandSyntaxException {
-        ServerCommandSource source = ctx.getSource();
-        UUID regionId = UuidArgumentType.getUuid(ctx, "region");
+    private int delete(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSourceStack source = ctx.getSource();
+        UUID regionId = UuidArgument.getUuid(ctx, "region");
         var found = RegionLookup.findById(source.getServer(), regionId);
-
         if (found.isEmpty()) {
             return CommandFeedback.error(
                     source,
-                    Text.translatable("privit.command.delete.not_found", regionId.toString())
+                    Component.translatable("privit.command.delete.not_found", regionId.toString())
             );
         }
-
         RegionLookup.LocatedRegion located = found.get();
         Region region = located.region();
 
-        if (!CommandPermissions.operator(source)) {
-            ServerPlayerEntity player = PlayerIdentityResolver.requirePlayer(source);
-            if (!region.isOwner(player.getUuid())) {
+        if (!CommandPermissions.canManage(source)) {
+            ServerPlayer player = PlayerIdentityResolver.requirePlayer(source);
+            if (!region.isOwner(player.getUUID())) {
                 return CommandFeedback.error(
                         source,
-                        Text.translatable("privit.command.delete.not_owner")
+                        Component.translatable("privit.command.delete.not_owner")
                 );
             }
         }
@@ -68,13 +65,13 @@ public final class DeleteCommand implements CommandModule, PlayerAccess, Operato
         String name = region.name();
         var result = located.manager().tryDelete(regionId, null);
         if (!result.isSuccess()) {
-            return CommandFeedback.error(source, Text.translatable("privit.command.delete.failed", name));
+            return CommandFeedback.error(source, Component.translatable("privit.command.delete.failed", name));
         }
 
-        WorldRegistry.get(located.world()).getRegionGuiSessions().close(regionId);
-        WorldRegistry.get(located.world()).getGridSubscriptions()
-                .hide(regionId, located.world().getPlayers());
+        WorldRegistry.get(located.level()).getRegionGuiSessions().close(regionId);
+        WorldRegistry.get(located.level()).getGridSubscriptions()
+                .hide(regionId, located.level().players());
 
-        return CommandFeedback.success(source, Text.translatable("privit.command.delete.success", name, regionId.toString()));
+        return CommandFeedback.success(source, Component.translatable("privit.command.delete.success", name, regionId.toString()));
     }
 }

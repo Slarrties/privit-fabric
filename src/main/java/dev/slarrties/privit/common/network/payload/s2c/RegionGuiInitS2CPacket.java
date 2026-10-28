@@ -3,18 +3,17 @@ package dev.slarrties.privit.common.network.payload.s2c;
 import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.common.region.gui.state.RegionGuiState;
 
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
-public record RegionGuiInitS2CPacket(RegionGuiState state, boolean openGui) implements CustomPayload {
+public record RegionGuiInitS2CPacket(RegionGuiState state, boolean openGui) implements CustomPacketPayload {
+    public static final Type<RegionGuiInitS2CPacket> TYPE = new Type<>(PrivitMod.id("region_gui_init"));
 
-    public static final Id<RegionGuiInitS2CPacket> ID = new Id<>(PrivitMod.id("region_gui_init"));
-
-    public static final PacketCodec<PacketByteBuf, RegionGuiInitS2CPacket> CODEC = PacketCodec.of(
-            (value, buf) -> {
-                value.state.writeToBuf(buf);
-                buf.writeBoolean(value.openGui);
+    public static final StreamCodec<FriendlyByteBuf, RegionGuiInitS2CPacket> CODEC = StreamCodec.of(
+            (FriendlyByteBuf buf, RegionGuiInitS2CPacket packet) -> {
+                packet.state.writeToBuf(buf);
+                buf.writeBoolean(packet.openGui);
             },
             buf -> new RegionGuiInitS2CPacket(
                     RegionGuiState.readFromBuf(buf),
@@ -23,7 +22,7 @@ public record RegionGuiInitS2CPacket(RegionGuiState state, boolean openGui) impl
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

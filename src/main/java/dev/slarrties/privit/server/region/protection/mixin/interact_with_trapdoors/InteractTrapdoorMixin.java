@@ -8,18 +8,20 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.redstone.handler.RedstoneReceiverHandler;
 
-import net.minecraft.world.World;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.TrapdoorBlock;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.TrapDoorBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.redstone.Orientation;
+import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -29,36 +31,36 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.UUID;
 
 @AssociatedRule(Rule.INTERACT_WITH_TRAPDOORS)
-@Mixin(TrapdoorBlock.class)
+@Mixin(TrapDoorBlock.class)
 public abstract class InteractTrapdoorMixin {
 
-    @Inject(method = "onUse", at = @At("HEAD"), cancellable = true)
-    private void preventTrapdoorUse(BlockState state, World world, BlockPos pos,
-                                    PlayerEntity player, BlockHitResult hit, CallbackInfoReturnable<ActionResult> cir) {
-        if (!(player instanceof ServerPlayerEntity serverPlayer)) return;
-        if (RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_TRAPDOORS, pos)) return;
+    @Inject(method = "useWithoutItem", at = @At("HEAD"), cancellable = true)
+    private void preventTrapdoorUse(BlockState state, Level level, BlockPos pos,
+                                    Player player, BlockHitResult hit, CallbackInfoReturnable<InteractionResult> cir) {
+        if (!(player instanceof ServerPlayer serverPlayer)) return;
+        if (RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.INTERACT_WITH_TRAPDOORS, pos, serverPlayer.level())) return;
 
         PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_TRAPDOOR, Color.RED);
-        serverPlayer.networkHandler.sendPacket(new BlockUpdateS2CPacket(pos, state));
-        cir.setReturnValue(ActionResult.FAIL);
+        serverPlayer.connection.send(new ClientboundBlockUpdatePacket(pos, state));
+        cir.setReturnValue(InteractionResult.FAIL);
     }
 
-    @Inject(method = "neighborUpdate", at = @At("TAIL"))
-    private void preventRedstoneTrapdoorOpen(BlockState state, World world, BlockPos pos, Block sourceBlock,
-                                             BlockPos sourcePos, boolean notify, CallbackInfo ci) {
-        if (!(world instanceof ServerWorld serverWorld)) return;
+    @Inject(method = "neighborChanged", at = @At("TAIL"))
+    private void preventRedstoneTrapdoorOpen(BlockState state, Level level, BlockPos pos, Block block,
+                                             @Nullable Orientation orientation, boolean movedByPiston, CallbackInfo ci) {
+        if (!(level instanceof ServerLevel serverLevel)) return;
 
-        boolean allowed = RedstoneReceiverHandler.isActionAllowed(serverWorld, pos, Rule.INTERACT_WITH_TRAPDOORS, sourcePos);
+        BlockPos sourcePos = orientation != null ? pos.relative(orientation.getFront()) : pos;
+        boolean allowed = RedstoneReceiverHandler.isActionAllowed(serverLevel, pos, Rule.INTERACT_WITH_TRAPDOORS, sourcePos);
         if (allowed) return;
 
-        BlockState closedState = state.with(TrapdoorBlock.OPEN, false);
-        world.setBlockState(pos, closedState, 2 | 4); // notify clients + skip callbacks
-        serverWorld.getPlayers().forEach(p -> p.networkHandler.sendPacket(new BlockUpdateS2CPacket(pos, closedState)));
-
-        UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverWorld, sourcePos);
+        BlockState closedState = state.setValue(TrapDoorBlock.OPEN, false);
+        level.setBlock(pos, closedState, 2 | 4); // 2 = notify clients, 4 = skip callbacks
+        serverLevel.getPlayers(p -> true).forEach(p -> p.connection.send(new ClientboundBlockUpdatePacket(pos, closedState)));
+        UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverLevel, sourcePos);
         if (responsible != null) {
-            ServerPlayerEntity serverPlayer = serverWorld.getServer()
-                    .getPlayerManager()
+            ServerPlayer serverPlayer = serverLevel.getServer()
+                    .getPlayerList()
                     .getPlayer(responsible);
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_TRAPDOOR, Color.RED);
         }

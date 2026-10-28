@@ -1,36 +1,35 @@
 package dev.slarrties.privit.server.command.support.feedback;
 
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.commands.CommandSourceStack;
 
 public final class CommandFeedback {
-
     private CommandFeedback() {}
 
-    public static int success(ServerCommandSource source, Text message) {
-        source.sendFeedback(() -> message, true);
+    public static int success(CommandSourceStack source, Component message) {
+        source.sendSuccess(() -> message, true);
         return 1;
     }
 
-    public static int success(ServerCommandSource source, String message) {
-        return success(source, Text.literal(message));
+    public static int success(CommandSourceStack source, String message) {
+        return success(source, Component.literal(message));
     }
 
-    public static int error(ServerCommandSource source, Text message) {
-        source.sendError(message);
+    public static int error(CommandSourceStack source, Component message) {
+        source.sendFailure(message);
         return 0;
     }
 
-    public static int error(ServerCommandSource source, String message) {
-        return error(source, Text.literal(message).formatted(Formatting.RED));
+    public static int error(CommandSourceStack source, String message) {
+        return error(source, Component.literal(message).withStyle(ChatFormatting.RED));
     }
 
-    public static void info(ServerCommandSource source, Text message) {
-        source.sendFeedback(() -> message, false);
+    public static void info(CommandSourceStack source, Component message) {
+        source.sendSuccess(() -> message, false);
     }
 
-    public static void info(ServerCommandSource source, String message) {
-        info(source, Text.literal(message));
+    public static void info(CommandSourceStack source, String message) {
+        info(source, Component.literal(message));
     }
 }

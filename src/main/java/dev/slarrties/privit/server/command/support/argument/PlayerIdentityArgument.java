@@ -7,23 +7,23 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 
-import net.minecraft.text.Text;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.CommandSourceStack;
 
 import java.util.UUID;
 
 public final class PlayerIdentityArgument {
-
     private static final SimpleCommandExceptionType PLAYER_NOT_FOUND =
-            new SimpleCommandExceptionType(Text.translatable("privit.command.regions.player_not_found", ""));
+            new SimpleCommandExceptionType(Component.translatable("privit.command.regions.player_not_found", ""));
 
-    private static final SuggestionProvider<ServerCommandSource> ONLINE_PLAYERS = (context, builder) -> {
+    private static final SuggestionProvider<CommandSourceStack> ONLINE_PLAYERS = (context, builder) -> {
         String remaining = builder.getRemainingLowerCase();
 
-        for (ServerPlayerEntity player : context.getSource().getServer().getPlayerManager().getPlayerList()) {
+        for (ServerPlayer player : context.getSource().getServer().getPlayerList().getPlayers()) {
             String name = player.getName().getString();
+
             if (name.toLowerCase().startsWith(remaining)) {
                 builder.suggest(name);
             }
@@ -34,22 +34,17 @@ public final class PlayerIdentityArgument {
     private PlayerIdentityArgument() {
     }
 
-    public static RequiredArgumentBuilder<ServerCommandSource, String> player(String name) {
-        return CommandManager.argument(name, StringArgumentType.word())
-                .suggests(ONLINE_PLAYERS);
+    public static RequiredArgumentBuilder<CommandSourceStack, String> player(String name) {
+        return Commands.argument(name, StringArgumentType.word()).suggests(ONLINE_PLAYERS);
     }
 
-    public static UUID getUuid(CommandContext<ServerCommandSource> context, String name)
-            throws CommandSyntaxException {
+    public static UUID getUuid(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException {
         String input = StringArgumentType.getString(context, name);
-
         return PlayerIdentityResolver.resolveUuid(context.getSource(), input)
-                .orElseThrow(() -> new SimpleCommandExceptionType(
-                        Text.translatable("privit.command.regions.player_not_found", input)
-                ).create());
+                .orElseThrow(() -> new SimpleCommandExceptionType(Component.translatable("privit.command.regions.player_not_found", input)).create());
     }
 
-    public static String getRaw(CommandContext<ServerCommandSource> context, String name) {
+    public static String getRaw(CommandContext<CommandSourceStack> context, String name) {
         return StringArgumentType.getString(context, name);
     }
 }

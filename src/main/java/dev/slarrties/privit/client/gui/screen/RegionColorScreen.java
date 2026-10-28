@@ -6,12 +6,13 @@ import dev.slarrties.privit.client.gui.RegionGuiController;
 import dev.slarrties.privit.common.region.Color;
 import dev.slarrties.privit.common.network.payload.c2s.RegionGuiUpdateC2SPacket;
 
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ButtonTextures;
+import net.minecraft.resources.Identifier;
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.WidgetSprites;
+import net.minecraft.client.renderer.RenderPipelines;
 
 import java.util.Optional;
 
@@ -25,20 +26,20 @@ public class RegionColorScreen extends Screen {
     private static final int BG_WIDTH = 210;
     private static final int BG_HEIGHT = 180;
 
-    private static final Identifier BACKGROUND = Identifier.of(PrivitMod.MOD_ID, "textures/gui/region_gui_background.png");
-    private static final ButtonTextures BUTTON_BACKGROUND = new ButtonTextures(
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_bg_common.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_bg_common_pressed.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_bg_common_active.png")
+    private static final Identifier BACKGROUND = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/region_gui_background.png");
+    private static final WidgetSprites BUTTON_BACKGROUND = new WidgetSprites(
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_bg_common.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_bg_common_pressed.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_bg_common_active.png")
     );
-    private static final ButtonTextures WIDE_BUTTON_BACKGROUND = new ButtonTextures(
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common_pressed.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common_active.png")
+    private static final WidgetSprites WIDE_BUTTON_BACKGROUND = new WidgetSprites(
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common_pressed.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common_active.png")
     );
 
     public RegionColorScreen(RegionGuiController controller) {
-        super(Text.empty());
+        super(Component.empty());
         this.controller = controller;
     }
 
@@ -60,19 +61,19 @@ public class RegionColorScreen extends Screen {
             int x = startX + col * (BUTTON_SIZE + GAP);
             int y = startY + row * (BUTTON_SIZE + GAP);
 
-            GuiButton button = new GuiButton.Builder(Text.empty(), btn -> {
+            GuiButton button = new GuiButton.Builder(Component.empty(), btn -> {
                 if (color == this.controller.getLocalState().color()) return;
 
                 RegionGuiUpdateC2SPacket packet = new RegionGuiUpdateC2SPacket(
                         this.controller.getLocalState().id(),
                         true,
-                        MinecraftClient.getInstance().player.getName().getString(),
+                        Minecraft.getInstance().player.getName().getString(),
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                         Optional.of(color), Optional.empty(), Optional.empty()
                 );
 
                 this.controller.sendUpdate(packet);
-                client.setScreen(new RegionScreen(this.controller));
+                this.minecraft.setScreen(new RegionScreen(this.controller));
             })
                     .dimensions(x, y, BUTTON_SIZE, BUTTON_SIZE)
                     .setBackground(BUTTON_BACKGROUND)
@@ -80,8 +81,7 @@ public class RegionColorScreen extends Screen {
                     .build();
 
             if (color == currentColor) button.active = false;
-
-            addDrawableChild(button);
+            addRenderableWidget(button);
         }
 
         int cancelWidth = 100;
@@ -89,8 +89,8 @@ public class RegionColorScreen extends Screen {
         int cancelX = bgX + (BG_WIDTH - cancelWidth) / 2;
         int cancelY = startY + 3 * (BUTTON_SIZE + GAP) + 25;
 
-        addDrawableChild(new GuiButton.Builder(Text.translatable("privit.gui.button.cancel"), btn -> {
-            client.setScreen(new RegionScreen(this.controller));
+        addRenderableWidget(new GuiButton.Builder(Component.translatable("privit.gui.button.cancel"), btn -> {
+            this.minecraft.setScreen(new RegionScreen(this.controller));
         })
                 .dimensions(cancelX, cancelY, cancelWidth, cancelHeight)
                 .setBackground(WIDE_BUTTON_BACKGROUND)
@@ -116,35 +116,47 @@ public class RegionColorScreen extends Screen {
             case YELLOW -> "textures/gui/icon_yellow.png";
             case WHITE -> "textures/gui/icon_white.png";
         };
-        return Identifier.of(PrivitMod.MOD_ID, iconPath);
+        return Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, iconPath);
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         int bgX = (this.width - BG_WIDTH) / 2;
         int bgY = (this.height - BG_HEIGHT) / 2;
 
-        renderBackground(context, mouseX, mouseY, delta);
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("privit.gui.color.text.title"), bgX + BG_WIDTH / 2, bgY + 15, 0xFFFFFF);
-        super.render(context, mouseX, mouseY, delta);
+        this.extractBackground(graphics, mouseX, mouseY, delta);
+        graphics.centeredText(
+                this.font,
+                Component.translatable("privit.gui.color.text.title"),
+                bgX + BG_WIDTH / 2,
+                bgY + 15,
+                0xFFFFFFFF
+        );
+        super.extractRenderState(graphics, mouseX, mouseY, delta);
     }
 
     @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         int x = (this.width - BG_WIDTH) / 2;
         int y = (this.height - BG_HEIGHT) / 2;
 
-        context.fillGradient(0, 0, this.width, this.height, 0xC0101010, 0xD0101010);
-        context.drawTexture(BACKGROUND, x, y, 0, 0, BG_WIDTH, BG_HEIGHT, BG_WIDTH, BG_HEIGHT);
+        graphics.fillGradient(0, 0, this.width, this.height, 0xC0101010, 0xD0101010);
+        graphics.blit(
+                RenderPipelines.GUI_TEXTURED,
+                BACKGROUND,
+                x, y, 0, 0,
+                BG_WIDTH, BG_HEIGHT,
+                BG_WIDTH, BG_HEIGHT
+        );
     }
 
     @Override
-    public void close() {
-        client.setScreen(new RegionScreen(this.controller));
+    public void onClose() {
+        this.minecraft.setScreen(new RegionScreen(this.controller));
     }
 
     @Override
-    public boolean shouldPause() {
+    public boolean isPauseScreen() {
         return false;
     }
 }

@@ -5,14 +5,15 @@ import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.tracking.protection.FluidOriginTracker;
 
-import net.minecraft.fluid.FluidState;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Waterloggable;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.core.BlockPos;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.block.LiquidBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -25,30 +26,31 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class FluidBlockItemPlacementMixin {
 
     @Inject(
-            method = "place(Lnet/minecraft/item/ItemPlacementContext;)Lnet/minecraft/util/ActionResult;",
+            method = "place(Lnet/minecraft/world/item/context/BlockPlaceContext;)Lnet/minecraft/world/InteractionResult;",
             at = @At("RETURN")
     )
-    private void onBlockPlaced(ItemPlacementContext context, CallbackInfoReturnable<ActionResult> cir) {
-        if (context.getWorld().isClient || !(context.getWorld() instanceof ServerWorld serverWorld)) return;
+    private void onBlockPlaced(BlockPlaceContext context, CallbackInfoReturnable<InteractionResult> cir) {
+        if (context.getLevel().isClientSide() || !(context.getLevel() instanceof ServerLevel serverLevel)) return;
 
-        BlockPos pos = context.getBlockPos();
-        FluidState fluidState = serverWorld.getFluidState(pos);
-        BlockState placedState = serverWorld.getBlockState(pos);
-        FluidOriginTracker fluidTracker = WorldRegistry.get(serverWorld)
+        BlockPos pos = context.getClickedPos();
+        FluidState fluidState = serverLevel.getFluidState(pos);
+        BlockState placedState = serverLevel.getBlockState(pos);
+
+        FluidOriginTracker fluidTracker = WorldRegistry.get(serverLevel)
                 .getTrackerManager()
                 .getFluidOriginTracker();
 
-        if (fluidState.isEmpty() && !isFluidPermeable(placedState, serverWorld, pos)) {
+        if (fluidState.isEmpty() && !isFluidPermeable(placedState, serverLevel, pos)) {
             fluidTracker.remove(pos);
         }
     }
 
     @Unique
-    private static boolean isFluidPermeable(BlockState state, ServerWorld world, BlockPos pos) {
-        if (state.getBlock() instanceof Waterloggable) {
+    private static boolean isFluidPermeable(BlockState state, ServerLevel level, BlockPos pos) {
+        if (state.getBlock() instanceof LiquidBlock) { // Waterlogged
             return true;
         }
 
-        return state.isTransparent(world, pos) || state.isIn(net.minecraft.registry.tag.BlockTags.REPLACEABLE);
+        return !state.isSolid() || state.is(BlockTags.REPLACEABLE);
     }
 }

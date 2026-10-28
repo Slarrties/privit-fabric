@@ -4,9 +4,8 @@ import dev.slarrties.privit.server.region.Region;
 import dev.slarrties.privit.common.region.rule.Rule;
 import dev.slarrties.privit.server.tracking.PlayerRegionPresenceTracker;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.network.ServerPlayerEntity;
-
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
@@ -20,10 +19,10 @@ public final class PlayerPermissionCache {
 
     private PlayerPermissionCache() {}
 
-    public static boolean isAllowed(ServerPlayerEntity player, Rule rule, BlockPos pos) {
-        if (player.getWorld().isClient) return true;
+    public static boolean isAllowed(ServerPlayer player, Rule rule, BlockPos pos) {
+        if (player.level().isClientSide()) return true;
 
-        UUID uuid = player.getUuid();
+        UUID uuid = player.getUUID();
         Region currentRegion = PlayerRegionPresenceTracker.getCurrentRegion(player);
 
         if (currentRegion == null) {
@@ -42,12 +41,12 @@ public final class PlayerPermissionCache {
         return playerRules.get(rule);
     }
 
-    public static void onRegionChanged(ServerPlayerEntity player, @Nullable Region from, @Nullable Region to) {
-        PLAYER_CACHE.remove(player.getUuid());
+    public static void onRegionChanged(ServerPlayer player, @Nullable Region from, @Nullable Region to) {
+        PLAYER_CACHE.remove(player.getUUID());
     }
 
-    public static void invalidatePlayer(ServerPlayerEntity player) {
-        if (player != null) PLAYER_CACHE.remove(player.getUuid());
+    public static void invalidatePlayer(ServerPlayer player) {
+        if (player != null) PLAYER_CACHE.remove(player.getUUID());
     }
 
     public static void invalidateRegion(Region region) {

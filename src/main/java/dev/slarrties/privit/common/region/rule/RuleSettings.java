@@ -2,8 +2,8 @@ package dev.slarrties.privit.common.region.rule;
 
 import dev.slarrties.privit.common.config.ConfigManager;
 
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.FriendlyByteBuf;
 
 import java.util.*;
 
@@ -49,14 +49,12 @@ public class RuleSettings implements RuleFreezeObserver, AutoCloseable {
             if (!isRuleAllowed(rule)) continue;
 
             boolean def;
-
             if ("owner".equals(groupName)) {
                 def = true;
             } else {
                 def = ConfigManager.get().defaultRules.rules
                         .getOrDefault(rule.name(), false);
             }
-
             activeRules.put(rule, def);
         }
     }
@@ -86,80 +84,75 @@ public class RuleSettings implements RuleFreezeObserver, AutoCloseable {
         return new ArrayList<>(activeRules.keySet());
     }
 
-    public NbtCompound toNbt() {
-        NbtCompound nbt = new NbtCompound();
-        NbtCompound active = new NbtCompound();
-        NbtCompound frozen = new NbtCompound();
-
+    public CompoundTag toNbt() {
+        CompoundTag nbt = new CompoundTag();
+        CompoundTag active = new CompoundTag();
+        CompoundTag frozen = new CompoundTag();
         activeRules.forEach((r, v) -> active.putBoolean(r.name(), v));
         frozenStates.forEach((r, v) -> frozen.putBoolean(r.name(), v));
-
         nbt.put("active", active);
         nbt.put("frozen", frozen);
         return nbt;
     }
 
-    public static RuleSettings fromNbt(NbtCompound nbt, String groupName) {
+    public static RuleSettings fromNbt(CompoundTag nbt, String groupName) {
         RuleSettings settings = new RuleSettings(groupName);
 
-        NbtCompound activeTag = nbt.getCompound("active");
-        for (String key : activeTag.getKeys()) {
+        CompoundTag activeTag = nbt.getCompoundOrEmpty("active");
+        for (String key : activeTag.keySet()) {
             try {
                 Rule rule = Rule.valueOf(key);
-                settings.activeRules.put(rule, activeTag.getBoolean(key));
-            } catch (Exception ignored) {}
+                settings.activeRules.put(rule, activeTag.getBooleanOr(key, false));
+            } catch (IllegalArgumentException ignored) {
+                //
+            }
         }
 
-        NbtCompound frozenTag = nbt.getCompound("frozen");
-        for (String key : frozenTag.getKeys()) {
+        CompoundTag frozenTag = nbt.getCompoundOrEmpty("frozen");
+        for (String key : frozenTag.keySet()) {
             try {
                 Rule rule = Rule.valueOf(key);
-                settings.frozenStates.put(rule, frozenTag.getBoolean(key));
-            } catch (Exception ignored) {}
+                settings.frozenStates.put(rule, frozenTag.getBooleanOr(key, false));
+            } catch (IllegalArgumentException ignored) {}
         }
 
         settings.syncWithCurrentFreezeState();
         return settings;
     }
 
-    public void writeToBuf(PacketByteBuf buf) {
+    public void writeToBuf(FriendlyByteBuf buf) {
         buf.writeVarInt(activeRules.size());
         for (Map.Entry<Rule, Boolean> entry : activeRules.entrySet()) {
-            buf.writeEnumConstant(entry.getKey());
+            buf.writeEnum(entry.getKey());
             buf.writeBoolean(entry.getValue());
         }
-
         buf.writeVarInt(frozenStates.size());
         for (Map.Entry<Rule, Boolean> entry : frozenStates.entrySet()) {
-            buf.writeEnumConstant(entry.getKey());
+            buf.writeEnum(entry.getKey());
             buf.writeBoolean(entry.getValue());
         }
     }
 
-    public static RuleSettings readFromBuf(PacketByteBuf buf, String groupName) {
+    public static RuleSettings readFromBuf(FriendlyByteBuf buf, String groupName) {
         RuleSettings settings = new RuleSettings(groupName, false);
-
         int activeCount = buf.readVarInt();
         for (int i = 0; i < activeCount; i++) {
-            Rule rule = buf.readEnumConstant(Rule.class);
+            Rule rule = buf.readEnum(Rule.class);
             boolean enabled = buf.readBoolean();
             settings.activeRules.put(rule, enabled);
         }
-
         int frozenCount = buf.readVarInt();
         for (int i = 0; i < frozenCount; i++) {
-            Rule rule = buf.readEnumConstant(Rule.class);
+            Rule rule = buf.readEnum(Rule.class);
             boolean enabled = buf.readBoolean();
             settings.frozenStates.put(rule, enabled);
         }
-
         return settings;
     }
 
     @Override
     public void onFreezeChanged(Rule rule, boolean nowFrozen) {
         if (!isRuleAllowed(rule)) return;
-
         if (nowFrozen) {
             if (activeRules.containsKey(rule)) {
                 frozenStates.put(rule, activeRules.remove(rule));
@@ -183,7 +176,6 @@ public class RuleSettings implements RuleFreezeObserver, AutoCloseable {
             }
 
             boolean isCurrentlyFrozen = FrozenRules.isFrozen(rule);
-
             if (isCurrentlyFrozen) {
                 if (!frozenStates.containsKey(rule) && activeRules.containsKey(rule)) {
                     frozenStates.put(rule, activeRules.remove(rule));

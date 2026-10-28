@@ -6,12 +6,12 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.entity.ai.goal.TemptGoal;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.mob.PathAwareEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.ai.goal.TemptGoal;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,31 +24,32 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(TemptGoal.class)
 public abstract class TemptAnimalMixin {
 
-    @Shadow @Final protected PathAwareEntity mob;
-    @Shadow protected PlayerEntity closestPlayer;
+    @Shadow @Final
+    protected Mob mob;
 
-    @Inject(method = "canStart", at = @At("RETURN"), cancellable = true)
+    @Shadow
+    protected Player player;
+
+    @Inject(method = "canUse", at = @At("RETURN"), cancellable = true)
     private void handleTempt(CallbackInfoReturnable<Boolean> cir) {
         if (!cir.getReturnValue()) return;
-        if (this.mob.getWorld().isClient) return;
+        if (this.mob.level().isClientSide()) return;
 
-        PlayerEntity player = this.closestPlayer;
-        if (!(player instanceof ServerPlayerEntity serverPlayer)) return;
+        Player player = this.player;
+        if (!(player instanceof ServerPlayer serverPlayer)) return;
 
-        BlockPos checkPos = this.mob.getBlockPos();
-        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_ANIMALS, checkPos);
-
+        BlockPos checkPos = this.mob.blockPosition();
+        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.INTERACT_WITH_ANIMALS, checkPos, serverPlayer.level());
         if (!allowed) {
             cir.setReturnValue(false);
             return;
         }
 
-        if (this.mob.getWorld() instanceof ServerWorld serverWorld) {
-            InfluencedEntityTracker tracker = WorldRegistry.get(serverWorld)
+        if (this.mob.level() instanceof ServerLevel serverLevel) {
+            InfluencedEntityTracker tracker = WorldRegistry.get(serverLevel)
                     .getTrackerManager()
                     .getInfluencedEntityTracker();
-
-            tracker.record(this.mob, serverPlayer.getUuid());
+            tracker.record(this.mob, serverPlayer.getUUID());
         }
     }
 }

@@ -2,20 +2,19 @@ package dev.slarrties.privit.common.network.payload.c2s;
 
 import dev.slarrties.privit.PrivitMod;
 
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 import java.util.Set;
 import java.util.UUID;
 import java.util.HashSet;
 
-public record RequestPlayerNamesC2SPacket(Set<UUID> uuids) implements CustomPayload {
+public record RequestPlayerNamesC2SPacket(Set<UUID> uuids) implements CustomPacketPayload {
+    public static final Type<RequestPlayerNamesC2SPacket> TYPE = new Type<>(PrivitMod.id("request_player_names"));
 
-    public static final Id<RequestPlayerNamesC2SPacket> ID = new Id<>(PrivitMod.id("request_player_names"));
-
-    public static final PacketCodec<PacketByteBuf, RequestPlayerNamesC2SPacket> CODEC = PacketCodec.of(
-            RequestPlayerNamesC2SPacket::write,
+    public static final StreamCodec<FriendlyByteBuf, RequestPlayerNamesC2SPacket> CODEC = StreamCodec.of(
+            (FriendlyByteBuf buf, RequestPlayerNamesC2SPacket packet) -> packet.write(buf),
             RequestPlayerNamesC2SPacket::read
     );
 
@@ -25,27 +24,24 @@ public record RequestPlayerNamesC2SPacket(Set<UUID> uuids) implements CustomPayl
         }
     }
 
-    private void write(PacketByteBuf buf) {
+    private void write(FriendlyByteBuf buf) {
         buf.writeVarInt(uuids.size());
-
         for (UUID uuid : uuids) {
-            buf.writeUuid(uuid);
+            buf.writeUUID(uuid);
         }
     }
 
-    private static RequestPlayerNamesC2SPacket read(PacketByteBuf buf) {
+    private static RequestPlayerNamesC2SPacket read(FriendlyByteBuf buf) {
         int size = buf.readVarInt();
         Set<UUID> uuids = new HashSet<>(size);
-
         for (int i = 0; i < size; i++) {
-            uuids.add(buf.readUuid());
+            uuids.add(buf.readUUID());
         }
-
         return new RequestPlayerNamesC2SPacket(uuids);
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

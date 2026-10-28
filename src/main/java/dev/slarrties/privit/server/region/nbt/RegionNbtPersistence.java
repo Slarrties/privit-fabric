@@ -6,11 +6,14 @@ import dev.slarrties.privit.common.region.RegionGroups;
 import dev.slarrties.privit.server.region.Region;
 import dev.slarrties.privit.server.region.RegionManager;
 
-import net.minecraft.nbt.*;
-import net.minecraft.util.math.BlockBox;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.WorldSavePath;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.storage.LevelResource;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
 import java.util.UUID;
 import java.io.IOException;
@@ -21,33 +24,32 @@ import java.nio.file.StandardCopyOption;
 public final class RegionNbtPersistence {
 
     private static final String FILE_NAME = "privit_regions.dat";
-    private final ServerWorld world;
+    private final ServerLevel level;
     private final Path filePath;
 
-    public RegionNbtPersistence(ServerWorld world) {
-        this.world = world;
-        this.filePath = world.getServer()
-                .getSavePath(WorldSavePath.ROOT)
+    public RegionNbtPersistence(ServerLevel level) {
+        this.level = level;
+        this.filePath = level.getServer()
+                .getWorldPath(LevelResource.ROOT)
                 .resolve(PrivitMod.MOD_ID)
-                .resolve(world.getRegistryKey().getValue().getPath())
+                .resolve(level.dimension().identifier().toString().replace(':', '_'))
                 .resolve(FILE_NAME);
         createDirectories();
     }
 
     public void load(RegionManager manager) {
         if (!Files.exists(filePath)) {
-            PrivitMod.LOGGER.info("[NbtRegionStorage] No regions save file found for dimension {}",
-                    world.getRegistryKey().getValue());
+            PrivitMod.LOGGER.info("[NbtRegionStorage] No regions save file found for dimension {}", level.dimension());
             return;
         }
 
         try (var input = Files.newInputStream(filePath)) {
-            NbtCompound root = NbtIo.readCompressed(input, NbtSizeTracker.ofUnlimitedBytes());
-            NbtList list = root.getList("regions", NbtElement.COMPOUND_TYPE);
-
+            CompoundTag root = NbtIo.readCompressed(input, NbtAccounter.unlimitedHeap());
+            ListTag list = root.getListOrEmpty("regions");
             int loaded = 0;
+
             for (int i = 0; i < list.size(); i++) {
-                NbtCompound tag = list.getCompound(i);
+                CompoundTag tag = list.getCompound(i).orElseThrow();
                 Region region = fromNbt(tag);
 
                 if (region != null) {
@@ -56,19 +58,17 @@ public final class RegionNbtPersistence {
                 }
             }
 
-            PrivitMod.LOGGER.info("[NbtRegionStorage] Loaded {} regions in dimension {}",
-                    loaded, world.getRegistryKey().getValue());
-
+            PrivitMod.LOGGER.info("[NbtRegionStorage] Loaded {} regions in dimension {}", loaded, level.dimension());
         } catch (IOException e) {
             PrivitMod.LOGGER.error("[NbtRegionStorage::load] Error loading regions from NBT", e);
         }
     }
 
     public void save(RegionManager manager) {
-        NbtList list = new NbtList();
+        ListTag list = new ListTag();
         manager.getAll().forEach(region -> list.add(toNbt(region)));
+        CompoundTag root = new CompoundTag();
 
-        NbtCompound root = new NbtCompound();
         root.put("regions", list);
 
         try {
@@ -79,9 +79,7 @@ public final class RegionNbtPersistence {
             }
 
             Files.move(tempPath, filePath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            PrivitMod.LOGGER.info("[NbtRegionStorage] Saved {} regions for dimension {}",
-                    list.size(), world.getRegistryKey().getValue());
-
+            PrivitMod.LOGGER.info("[NbtRegionStorage] Saved {} regions for dimension {}", list.size(), level.dimension());
         } catch (IOException e) {
             PrivitMod.LOGGER.error("[NbtRegionStorage] Error saving regions to NBT", e);
         }
@@ -95,46 +93,39 @@ public final class RegionNbtPersistence {
         }
     }
 
-    private static NbtCompound toNbt(Region region) {
-        NbtCompound tag = new NbtCompound();
-
-        tag.putUuid("id", region.id());
+    private static CompoundTag toNbt(Region region) {
+        CompoundTag tag = new CompoundTag();
+        tag.putString("id", region.id().toString());
         tag.putString("name", region.name());
         tag.putString("colorCode", region.color().getCode());
 
-        NbtCompound bounds = new NbtCompound();
-        bounds.putInt("minX", region.bounds().getMinX());
-        bounds.putInt("minY", region.bounds().getMinY());
-        bounds.putInt("minZ", region.bounds().getMinZ());
-        bounds.putInt("maxX", region.bounds().getMaxX());
-        bounds.putInt("maxY", region.bounds().getMaxY());
-        bounds.putInt("maxZ", region.bounds().getMaxZ());
+        CompoundTag bounds = new CompoundTag();
+        bounds.putInt("minX", region.bounds().minX());
+        bounds.putInt("minY", region.bounds().minY());
+        bounds.putInt("minZ", region.bounds().minZ());
+        bounds.putInt("maxX", region.bounds().maxX());
+        bounds.putInt("maxY", region.bounds().maxY());
+        bounds.putInt("maxZ", region.bounds().maxZ());
         tag.put("bounds", bounds);
 
         tag.putLong("pivotPos", region.pivotPos().asLong());
         tag.put("groups", region.groups().toNbt());
-
         return tag;
     }
 
-    private static Region fromNbt(NbtCompound tag) {
+    private static Region fromNbt(CompoundTag tag) {
         try {
-            UUID id = tag.getUuid("id");
-            String name = tag.getString("name");
-
-            String colorCodeStr = tag.contains("colorCode", NbtElement.STRING_TYPE)
-                    ? tag.getString("colorCode")
-                    : "§f";
+            UUID id = UUID.fromString(tag.getStringOr("id", ""));
+            String name = tag.getStringOr("name", "");
+            String colorCodeStr = tag.getStringOr("colorCode", "§f");
             Color color = Color.fromCode(colorCodeStr);
-
-            NbtCompound boundsTag = tag.getCompound("bounds");
-            BlockBox bounds = new BlockBox(
-                    boundsTag.getInt("minX"), boundsTag.getInt("minY"), boundsTag.getInt("minZ"),
-                    boundsTag.getInt("maxX"), boundsTag.getInt("maxY"), boundsTag.getInt("maxZ")
+            CompoundTag boundsTag = tag.getCompoundOrEmpty("bounds");
+            BoundingBox bounds = new BoundingBox(
+                    boundsTag.getIntOr("minX", 0), boundsTag.getIntOr("minY", 0), boundsTag.getIntOr("minZ", 0),
+                    boundsTag.getIntOr("maxX", 0), boundsTag.getIntOr("maxY", 0), boundsTag.getIntOr("maxZ", 0)
             );
-
-            BlockPos pivotPos = BlockPos.fromLong(tag.getLong("pivotPos"));
-            NbtCompound groupsTag = tag.getCompound("groups");
+            BlockPos pivotPos = BlockPos.of(tag.getLongOr("pivotPos", 0L));
+            CompoundTag groupsTag = tag.getCompoundOrEmpty("groups");
             RegionGroups groups = RegionGroups.fromNbt(groupsTag);
 
             return new Region.Builder(pivotPos, name, id)
@@ -145,7 +136,6 @@ public final class RegionNbtPersistence {
                     .color(color)
                     .groups(groups)
                     .build();
-
         } catch (Exception e) {
             PrivitMod.LOGGER.warn("[NbtRegionStorage] Region NBT data is corrupted — skipping", e);
             return null;

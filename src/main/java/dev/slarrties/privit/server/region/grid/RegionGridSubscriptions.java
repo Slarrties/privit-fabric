@@ -4,8 +4,8 @@ import dev.slarrties.privit.common.region.Color;
 import dev.slarrties.privit.common.network.payload.s2c.RegionGridStateS2CPacket;
 import dev.slarrties.privit.server.region.Region;
 
-import net.minecraft.util.math.BlockBox;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 import java.util.Set;
@@ -18,16 +18,16 @@ public final class RegionGridSubscriptions {
 
     private final Map<UUID, Set<UUID>> subscribers = new ConcurrentHashMap<>();
 
-    public void subscribe(UUID regionId, ServerPlayerEntity player) {
+    public void subscribe(UUID regionId, ServerPlayer player) {
         subscribers
                 .computeIfAbsent(regionId, id -> ConcurrentHashMap.newKeySet())
-                .add(player.getUuid());
+                .add(player.getUUID());
     }
 
-    public void unsubscribe(UUID regionId, ServerPlayerEntity player) {
+    public void unsubscribe(UUID regionId, ServerPlayer player) {
         Set<UUID> set = subscribers.get(regionId);
         if (set == null) return;
-        set.remove(player.getUuid());
+        set.remove(player.getUUID());
         if (set.isEmpty()) subscribers.remove(regionId);
     }
 
@@ -40,7 +40,7 @@ public final class RegionGridSubscriptions {
         subscribers.entrySet().removeIf(e -> e.getValue().isEmpty());
     }
 
-    public void publish(Region region, Iterable<ServerPlayerEntity> players) {
+    public void publish(Region region, Iterable<ServerPlayer> players) {
         publish(
                 region.id(),
                 region.color(),
@@ -54,10 +54,10 @@ public final class RegionGridSubscriptions {
     public void publish(
             UUID regionId,
             Color color,
-            BlockBox realBounds,
-            BlockBox draftBounds,
-            List<BlockBox> conflicts,
-            Iterable<ServerPlayerEntity> players
+            BoundingBox realBounds,
+            BoundingBox draftBounds,
+            List<BoundingBox> conflicts,
+            Iterable<ServerPlayer> players
     ) {
         Set<UUID> ids = subscribers.get(regionId);
         if (ids == null || ids.isEmpty()) return;
@@ -65,20 +65,20 @@ public final class RegionGridSubscriptions {
         RegionGridStateS2CPacket packet = RegionGridStateS2CPacket.show(
                 regionId, color, realBounds, draftBounds, conflicts);
 
-        for (ServerPlayerEntity player : players) {
-            if (ids.contains(player.getUuid())) {
+        for (ServerPlayer player : players) {
+            if (ids.contains(player.getUUID())) {
                 ServerPlayNetworking.send(player, packet);
             }
         }
     }
 
-    public void hide(UUID regionId, Iterable<ServerPlayerEntity> players) {
+    public void hide(UUID regionId, Iterable<ServerPlayer> players) {
         Set<UUID> ids = subscribers.remove(regionId);
         if (ids == null || ids.isEmpty()) return;
 
         RegionGridStateS2CPacket packet = RegionGridStateS2CPacket.hide(regionId);
-        for (ServerPlayerEntity player : players) {
-            if (ids.contains(player.getUuid())) {
+        for (ServerPlayer player : players) {
+            if (ids.contains(player.getUUID())) {
                 ServerPlayNetworking.send(player, packet);
             }
         }

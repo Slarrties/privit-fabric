@@ -7,12 +7,13 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.util.Hand;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.decoration.LeashKnotEntity;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.decoration.LeashFenceKnotEntity;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,20 +21,20 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @AssociatedRule(Rule.USE_LEASHES)
-@Mixin(LeashKnotEntity.class)
+@Mixin(LeashFenceKnotEntity.class)
 public abstract class UseLeashMixin {
 
     @Inject(method = "interact", at = @At("HEAD"), cancellable = true)
-    private void preventInteract(PlayerEntity player, Hand hand, CallbackInfoReturnable<ActionResult> cir) {
-        if (player.getWorld().isClient()) return;
-        if (!(player instanceof ServerPlayerEntity serverPlayer)) return;
+    private void preventInteract(Player player, InteractionHand hand, Vec3 location, CallbackInfoReturnable<InteractionResult> cir) {
+        if (player.level().isClientSide()) return;
+        if (!(player instanceof ServerPlayer serverPlayer)) return;
 
-        LeashKnotEntity self = (LeashKnotEntity) (Object) this;
-        BlockPos pos = self.getBlockPos();
+        LeashFenceKnotEntity self = (LeashFenceKnotEntity) (Object) this;
+        BlockPos pos = self.blockPosition();
 
-        if (!RegionPermissionChecker.isAllowed(serverPlayer, Rule.USE_LEASHES, pos)) {
+        if (!RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.USE_LEASHES, pos, serverPlayer.level())) {
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_USE_LEASH, Color.RED);
-            cir.setReturnValue(ActionResult.FAIL);
+            cir.setReturnValue(InteractionResult.FAIL);
         }
     }
 }

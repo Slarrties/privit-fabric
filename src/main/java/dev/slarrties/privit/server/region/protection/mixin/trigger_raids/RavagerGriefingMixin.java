@@ -6,11 +6,10 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 
-import net.minecraft.world.World;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.mob.RavagerEntity;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.monster.Ravager;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,29 +19,28 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import java.util.UUID;
 
 @AssociatedRule(Rule.TRIGGER_RAIDS)
-@Mixin(RavagerEntity.class)
+@Mixin(Ravager.class)
 public abstract class RavagerGriefingMixin {
 
     @WrapOperation(
-            method = "tickMovement",
+            method = "aiStep",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/world/World;breakBlock(Lnet/minecraft/util/math/BlockPos;ZLnet/minecraft/entity/Entity;)Z"
+                    target = "Lnet/minecraft/server/level/ServerLevel;destroyBlock(Lnet/minecraft/core/BlockPos;ZLnet/minecraft/world/entity/Entity;)Z"
             )
     )
-    private boolean wrapRavagerBlockBreaking(World world, BlockPos pos, boolean drop, Entity entity, Operation<Boolean> original) {
-        if (world instanceof ServerWorld serverWorld && entity instanceof RavagerEntity ravager) {
-            InfluencedEntityTracker influencedTracker = WorldRegistry.get(serverWorld)
+    private boolean wrapRavagerBlockBreaking(ServerLevel serverLevel, BlockPos blockPos, boolean b, Entity entity, Operation<Boolean> original) {
+        if (entity instanceof Ravager ravager) {
+            InfluencedEntityTracker influencedTracker = WorldRegistry.get(serverLevel)
                     .getTrackerManager()
                     .getInfluencedEntityTracker();
             UUID triggerUuid = influencedTracker.getResponsible(ravager);
 
             if (triggerUuid != null) {
-                boolean allowed = RegionPermissionChecker.isAllowed(triggerUuid, Rule.TRIGGER_RAIDS, pos, serverWorld);
+                boolean allowed = RegionPermissionChecker.isAllowed(triggerUuid, Rule.TRIGGER_RAIDS, blockPos, serverLevel);
                 if (!allowed) return false;
             }
         }
-
-        return original.call(world, pos, drop, entity);
+        return original.call(serverLevel, blockPos, b, entity);
     }
 }

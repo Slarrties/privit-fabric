@@ -7,11 +7,11 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.entity.projectile.thrown.EggEntity;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownEgg;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -19,20 +19,19 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @AssociatedRule(Rule.THROW_EGGS)
-@Mixin(EggEntity.class)
+@Mixin(ThrownEgg.class)
 public abstract class EggCollisionMixin {
 
-    @Inject(method = "onCollision(Lnet/minecraft/util/hit/HitResult;)V", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "onHit", at = @At("HEAD"), cancellable = true)
     private void cancelEggInProtectedRegion(HitResult hitResult, CallbackInfo ci) {
-        EggEntity egg = (EggEntity) (Object) this;
-        if (egg.getWorld().isClient) return;
+        ThrownEgg egg = (ThrownEgg) (Object) this;
+        if (egg.level().isClientSide()) return;
 
         Entity owner = egg.getOwner();
-        if (!(owner instanceof ServerPlayerEntity serverPlayer)) return;
+        if (!(owner instanceof ServerPlayer serverPlayer)) return;
 
-        BlockPos impactPos = BlockPos.ofFloored(hitResult.getPos());
-        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.THROW_EGGS, impactPos);
-
+        BlockPos impactPos = BlockPos.containing(hitResult.getLocation());
+        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.THROW_EGGS, impactPos, serverPlayer.level());
         if (!allowed) {
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_THROW_EGG, Color.RED);
             egg.discard();

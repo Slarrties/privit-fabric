@@ -5,15 +5,15 @@ import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.tracking.protection.IceOriginTracker;
 
-import net.minecraft.world.World;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.BlockState;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -25,24 +25,25 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class IcePlacementMixin {
 
     @Inject(
-            method = "place(Lnet/minecraft/item/ItemPlacementContext;)Lnet/minecraft/util/ActionResult;",
+            method = "place(Lnet/minecraft/world/item/context/BlockPlaceContext;)Lnet/minecraft/world/InteractionResult;",
             at = @At("RETURN")
     )
-    private void onIcePlaced(ItemPlacementContext context, CallbackInfoReturnable<ActionResult> cir) {
-        if (cir.getReturnValue() != ActionResult.SUCCESS && cir.getReturnValue() != ActionResult.CONSUME) return;
+    private void onIcePlaced(BlockPlaceContext context, CallbackInfoReturnable<InteractionResult> cir) {
+        InteractionResult result = cir.getReturnValue();
+        if (result != InteractionResult.SUCCESS && result != InteractionResult.CONSUME) return;
 
-        World world = context.getWorld();
-        if (world.isClient || !(world instanceof ServerWorld serverWorld)) return;
+        Level level = context.getLevel();
+        if (level.isClientSide() || !(level instanceof ServerLevel serverLevel)) return;
 
-        BlockPos pos = context.getBlockPos();
-        BlockState state = serverWorld.getBlockState(pos);
+        BlockPos pos = context.getClickedPos();
+        BlockState state = serverLevel.getBlockState(pos);
 
-        if (!state.isOf(Blocks.ICE)) return;
-        if (!(context.getPlayer() instanceof ServerPlayerEntity serverPlayer)) return;
+        if (!state.is(Blocks.ICE)) return;
+        if (!(context.getPlayer() instanceof ServerPlayer serverPlayer)) return;
 
-        IceOriginTracker iceOriginTracker = WorldRegistry.get(serverWorld)
+        IceOriginTracker iceOriginTracker = WorldRegistry.get(serverLevel)
                 .getTrackerManager()
                 .getIceOriginTracker();
-        iceOriginTracker.record(pos, serverPlayer.getUuid());
+        iceOriginTracker.record(pos, serverPlayer.getUUID());
     }
 }

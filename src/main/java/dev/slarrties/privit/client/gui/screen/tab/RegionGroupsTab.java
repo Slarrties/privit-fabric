@@ -5,9 +5,9 @@ import dev.slarrties.privit.client.gui.RegionGuiController;
 import dev.slarrties.privit.client.gui.screen.AddPlayerScreen;
 import dev.slarrties.privit.client.gui.screen.GroupEditScreen;
 import dev.slarrties.privit.client.gui.widget.GuiButton;
+import dev.slarrties.privit.client.gui.widget.list.RuleListWidget;
 import dev.slarrties.privit.client.gui.widget.list.GroupListWidget;
 import dev.slarrties.privit.client.gui.widget.list.PlayerListWidget;
-import dev.slarrties.privit.client.gui.widget.list.RuleListWidget;
 import dev.slarrties.privit.client.util.ClientPlayerIdentityCache;
 import dev.slarrties.privit.common.util.PlayerIdentity;
 import dev.slarrties.privit.common.region.rule.Rule;
@@ -16,14 +16,15 @@ import dev.slarrties.privit.common.region.RegionGroups;
 import dev.slarrties.privit.common.region.RegionPlayerGroup;
 import dev.slarrties.privit.common.network.payload.c2s.RegionGuiUpdateC2SPacket;
 
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.screen.ButtonTextures;
-import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.resources.Identifier;
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.WidgetSprites;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.input.MouseButtonEvent;
 
 import java.util.*;
 
@@ -36,7 +37,7 @@ public class RegionGroupsTab implements ITabPanel {
     private boolean isTabVisible = false;
 
     private final RegionGuiController controller;
-    private final TextRenderer textRenderer;
+    private final Font font;
     private final int x, y, width, height;
     private final int widthCenter;
     private final int rightX;
@@ -45,14 +46,15 @@ public class RegionGroupsTab implements ITabPanel {
     private static final int BUTTON_SIZE = 20;
     private static final int BUTTON_GAP = 8;
 
-    private static final ButtonTextures STANDARD_BUTTON_BACKGROUND = new ButtonTextures(
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_bg_common.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_bg_common_pressed.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_bg_common_active.png")
+    private static final WidgetSprites STANDARD_BUTTON_BACKGROUND = new WidgetSprites(
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_bg_common.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_bg_common_pressed.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_bg_common_active.png")
     );
-    private static final Identifier RULES_ICON = Identifier.of(PrivitMod.MOD_ID, "textures/gui/rules_icon.png");
-    private static final Identifier PLAYERS_ICON = Identifier.of(PrivitMod.MOD_ID, "textures/gui/players_icon.png");
-    private static final Identifier EDIT_PROPERTIES_ICON = Identifier.of(PrivitMod.MOD_ID, "textures/gui/edit_properties_icon.png");
+
+    private static final Identifier RULES_ICON = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/rules_icon.png");
+    private static final Identifier PLAYERS_ICON = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/players_icon.png");
+    private static final Identifier EDIT_PROPERTIES_ICON = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/edit_properties_icon.png");
 
     private GroupListWidget groupList;
     private PlayerListWidget playerList;
@@ -60,11 +62,12 @@ public class RegionGroupsTab implements ITabPanel {
     private GuiButton subTabRulesButton;
     private GuiButton subTabPlayersButton;
     private GuiButton extraTabButton;
-    private final List<ClickableWidget> widgets = new ArrayList<>();
 
-    public RegionGroupsTab(RegionGuiController controller, TextRenderer textRenderer, int x, int y, int width, int height) {
+    private final List<AbstractWidget> widgets = new ArrayList<>();
+
+    public RegionGroupsTab(RegionGuiController controller, Font font, int x, int y, int width, int height) {
         this.controller = controller;
-        this.textRenderer = textRenderer;
+        this.font = font;
         this.x = x;
         this.y = y;
         this.width = width;
@@ -138,36 +141,35 @@ public class RegionGroupsTab implements ITabPanel {
         );
 
         // ==================== buttons ====================
-
         int startX = rightX + 5;
 
         subTabRulesButton = new GuiButton.Builder(
-                Text.empty(),
+                Component.empty(),
                 btn -> switchSubTab(SubTab.RULES))
                 .dimensions(startX, y, BUTTON_SIZE, BUTTON_SIZE)
-                .tooltip(Tooltip.of(Text.translatable("privit.gui.groups.button.rules")))
+                .tooltip(Tooltip.create(Component.translatable("privit.gui.groups.button.rules")))
                 .icon(RULES_ICON, BUTTON_SIZE, BUTTON_SIZE, 0, -2)
                 .setBackground(STANDARD_BUTTON_BACKGROUND)
                 .build();
 
         subTabPlayersButton = new GuiButton.Builder(
-                Text.empty(),
+                Component.empty(),
                 btn -> switchSubTab(SubTab.PLAYERS))
                 .dimensions(startX + BUTTON_SIZE + BUTTON_GAP, y, BUTTON_SIZE, BUTTON_SIZE)
-                .tooltip(Tooltip.of(Text.translatable("privit.gui.groups.button.players")))
+                .tooltip(Tooltip.create(Component.translatable("privit.gui.groups.button.players")))
                 .icon(PLAYERS_ICON, BUTTON_SIZE, BUTTON_SIZE, 0, -2)
                 .setBackground(STANDARD_BUTTON_BACKGROUND)
                 .build();
 
-        extraTabButton = new GuiButton.Builder(Text.empty(), btn -> {
+        extraTabButton = new GuiButton.Builder(Component.empty(), btn -> {
             getSelectedGroup().ifPresent(group -> {
                 if (!group.isOwnerGroup() && !group.isVisitorsGroup()) {
-                    MinecraftClient.getInstance().setScreen(new GroupEditScreen(controller, group));
+                    Minecraft.getInstance().setScreen(new GroupEditScreen(controller, group));
                 }
             });
         })
                 .dimensions(startX + (BUTTON_SIZE + BUTTON_GAP) * 2, y, BUTTON_SIZE, BUTTON_SIZE)
-                .tooltip(Tooltip.of(Text.translatable("privit.gui.groups.button.edit")))
+                .tooltip(Tooltip.create(Component.translatable("privit.gui.groups.button.edit")))
                 .icon(EDIT_PROPERTIES_ICON, BUTTON_SIZE, BUTTON_SIZE, 0, -2)
                 .setBackground(STANDARD_BUTTON_BACKGROUND)
                 .build();
@@ -201,9 +203,11 @@ public class RegionGroupsTab implements ITabPanel {
 
     private void onGroupSelected(RegionPlayerGroup group) {
         selectedGroupName = group.getName();
+
         if (group.isVisitorsGroup() && currentSubTab == SubTab.PLAYERS) {
             currentSubTab = SubTab.RULES;
         }
+
         updateRightContent();
         updateUI();
     }
@@ -225,11 +229,7 @@ public class RegionGroupsTab implements ITabPanel {
     }
 
     private void onAddPlayerClicked() {
-        getSelectedGroup().ifPresent(group ->
-                MinecraftClient.getInstance().setScreen(
-                        new AddPlayerScreen(controller, group, this::updateRightContent)
-                )
-        );
+        getSelectedGroup().ifPresent(group -> Minecraft.getInstance().setScreen(new AddPlayerScreen(controller, group, this::updateRightContent)));
     }
 
     private void onRuleToggled(Rule rule, boolean newState) {
@@ -240,7 +240,6 @@ public class RegionGroupsTab implements ITabPanel {
                 if (oldGroup.isRuleEnabled(rule) == newState) return;
 
                 RegionPlayerGroup updated = new RegionPlayerGroup(oldGroup);
-
                 updated.setRuleEnabled(rule, newState);
                 sendGroupsUpdate(current.withUpdatedGroup(group.getName(), updated));
             });
@@ -256,7 +255,7 @@ public class RegionGroupsTab implements ITabPanel {
         RegionGuiUpdateC2SPacket packet = new RegionGuiUpdateC2SPacket(
                 this.controller.getLocalState().id(),
                 true,
-                MinecraftClient.getInstance().player.getName().getString(),
+                Minecraft.getInstance().player.getName().getString(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -266,7 +265,6 @@ public class RegionGroupsTab implements ITabPanel {
                 Optional.of(updatedGroups),
                 Optional.empty()
         );
-
         this.controller.sendUpdate(packet);
     }
 
@@ -285,7 +283,6 @@ public class RegionGroupsTab implements ITabPanel {
         }
 
         RegionPlayerGroup group = groupOpt.get();
-
         playerList.updateEntries(ClientPlayerIdentityCache.getInstance().getIdentities(group.getMembers()));
         playerList.setIsOwnerGroup(group.isOwnerGroup());
         ruleList.refreshEntries(group.getRuleSettings().getActiveRules());
@@ -304,14 +301,13 @@ public class RegionGroupsTab implements ITabPanel {
 
     private void updateButtonStates() {
         Optional<RegionPlayerGroup> groupOpt = getSelectedGroup();
-
         if (groupOpt.isEmpty()) {
             subTabRulesButton.active = false;
             subTabPlayersButton.active = false;
             extraTabButton.active = false;
-            subTabRulesButton.setTooltip(Tooltip.of(Text.literal("No group selected")));
-            subTabPlayersButton.setTooltip(Tooltip.of(Text.literal("No group selected")));
-            extraTabButton.setTooltip(Tooltip.of(Text.literal("No group selected")));
+            subTabRulesButton.setTooltip(Tooltip.create(Component.literal("No group selected")));
+            subTabPlayersButton.setTooltip(Tooltip.create(Component.literal("No group selected")));
+            extraTabButton.setTooltip(Tooltip.create(Component.literal("No group selected")));
             return;
         }
 
@@ -321,27 +317,26 @@ public class RegionGroupsTab implements ITabPanel {
         boolean isSpecial = isOwner || isVisitors;
 
         extraTabButton.active = !isSpecial;
-        extraTabButton.setTooltip(Tooltip.of(
+        extraTabButton.setTooltip(Tooltip.create(
                 isSpecial
-                        ? Text.translatable("privit.gui.groups.button.edit.disabled")
-                        : Text.translatable("privit.gui.groups.button.edit")
+                        ? Component.translatable("privit.gui.groups.button.edit.disabled")
+                        : Component.translatable("privit.gui.groups.button.edit")
         ));
 
         subTabPlayersButton.active = !isVisitors && (currentSubTab != SubTab.PLAYERS);
-        subTabPlayersButton.setTooltip(Tooltip.of(
+        subTabPlayersButton.setTooltip(Tooltip.create(
                 isVisitors
-                        ? Text.translatable("privit.gui.groups.button.players.disabled")
-                        : Text.translatable("privit.gui.groups.button.players")
+                        ? Component.translatable("privit.gui.groups.button.players.disabled")
+                        : Component.translatable("privit.gui.groups.button.players")
         ));
 
         subTabRulesButton.active = (currentSubTab != SubTab.RULES);
-        subTabRulesButton.setTooltip(Tooltip.of(Text.translatable("privit.gui.groups.button.rules")));
+        subTabRulesButton.setTooltip(Tooltip.create(Component.translatable("privit.gui.groups.button.rules")));
     }
 
     @Override
-    public List<ClickableWidget> getWidgets() {
-        List<ClickableWidget> all = new ArrayList<>(widgets);
-
+    public List<AbstractWidget> getWidgets() {
+        List<AbstractWidget> all = new ArrayList<>(widgets);
         if (playerList != null) all.add(playerList);
         if (groupList != null) all.add(groupList);
         if (ruleList != null) all.add(ruleList);
@@ -350,24 +345,23 @@ public class RegionGroupsTab implements ITabPanel {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        int titleWidth = textRenderer.getWidth(Text.translatable("privit.gui.groups.text.title"));
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+        int titleWidth = font.width(Component.translatable("privit.gui.groups.text.title"));
         int titleX = x + (widthCenter - titleWidth) / 2;
-
-        context.drawTextWithShadow(textRenderer,
-                Text.translatable("privit.gui.groups.text.title"),
+        graphics.text(font,
+                Component.translatable("privit.gui.groups.text.title"),
                 titleX, y + 5, 0xFFFFFFFF);
     }
 
     @Override
-    public void renderPendingTooltips(DrawContext context) {
-        if (groupList != null) groupList.renderPendingTooltip(context);
-        if (playerList != null) playerList.renderPendingTooltip(context);
-        if (ruleList != null) ruleList.renderPendingTooltip(context);
+    public void renderPendingTooltips(GuiGraphicsExtractor graphics) {
+        if (groupList != null) groupList.renderPendingTooltip(graphics);
+        if (playerList != null) playerList.renderPendingTooltip(graphics);
+        if (ruleList != null) ruleList.renderPendingTooltip(graphics);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         return false;
     }
 
@@ -389,8 +383,7 @@ public class RegionGroupsTab implements ITabPanel {
 
     @Override
     public void updateVisibility() {
-        for (ClickableWidget w : getWidgets()) w.visible = isTabVisible;
-
+        for (AbstractWidget w : getWidgets()) w.visible = isTabVisible;
         if (isTabVisible) {
             if (playerList != null) playerList.visible = (currentSubTab == SubTab.PLAYERS);
             if (ruleList != null) ruleList.visible = (currentSubTab == SubTab.RULES);
@@ -401,17 +394,14 @@ public class RegionGroupsTab implements ITabPanel {
     public void updateState() {
         RegionGroups currentGroups = controller.getLocalState().groups();
         List<RegionPlayerGroup> groupsList = currentGroups.getAll();
-
         groupList.updateEntries(new ArrayList<>(currentGroups.getAll()), selectedGroupName);
 
         if (selectedGroupName != null) {
-            if (currentGroups.findByName(selectedGroupName).isEmpty()) {
+            if (currentGroups.findByName(selectedGroupName).isEmpty())
                 selectedGroupName = groupsList.isEmpty() ? null : groupsList.get(0).getName();
-            }
         } else if (!groupsList.isEmpty()) {
             selectedGroupName = groupsList.get(0).getName();
         }
-
         updateRightContent();
         updateUI();
     }

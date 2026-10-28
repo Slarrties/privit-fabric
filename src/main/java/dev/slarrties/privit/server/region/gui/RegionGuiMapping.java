@@ -3,7 +3,7 @@ package dev.slarrties.privit.server.region.gui;
 import dev.slarrties.privit.server.region.Region;
 import dev.slarrties.privit.common.region.gui.state.RegionGuiState;
 
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
 public final class RegionGuiMapping {
 

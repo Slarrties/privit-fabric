@@ -4,11 +4,14 @@ import dev.slarrties.privit.common.region.rule.Rule;
 import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.vehicle.TntMinecartEntity;
-import net.minecraft.entity.vehicle.AbstractMinecartEntity;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.vehicle.minecart.MinecartTNT;
+import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,25 +19,22 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @AssociatedRule(Rule.INTERACT_WITH_MINECARTS)
-@Mixin(AbstractMinecartEntity.class)
+@Mixin(AbstractMinecart.class)
 public abstract class MinecartCreationMixin {
 
-    @Inject(
-            method = "create(Lnet/minecraft/server/world/ServerWorld;DDDLnet/minecraft/entity/vehicle/AbstractMinecartEntity$Type;Lnet/minecraft/item/ItemStack;Lnet/minecraft/entity/player/PlayerEntity;)Lnet/minecraft/entity/vehicle/AbstractMinecartEntity;",
-            at = @At("RETURN")
-    )
+    @Inject(method = "createMinecart", at = @At("RETURN"))
     private static void onMinecartCreated(
-            ServerWorld world, double x, double y, double z,
-            AbstractMinecartEntity.Type type, ItemStack stack,
-            PlayerEntity player, CallbackInfoReturnable<AbstractMinecartEntity> cir) {
-
-        AbstractMinecartEntity minecart = cir.getReturnValue();
+            Level level, double x, double y, double z,
+            EntityType<?> type, EntitySpawnReason reason, ItemStack stack,
+            Player player, CallbackInfoReturnable<AbstractMinecart> cir
+    ) {
+        AbstractMinecart minecart = cir.getReturnValue();
         if (minecart == null || player == null) return;
-        if (minecart instanceof TntMinecartEntity && minecart.getWorld() instanceof ServerWorld serverWorld) {
-            WorldRegistry.get(serverWorld)
+        if (minecart instanceof MinecartTNT && level instanceof ServerLevel serverLevel) {
+            WorldRegistry.get(serverLevel)
                     .getTrackerManager()
                     .getExplosionOriginTracker()
-                    .record(minecart, player.getUuid());
+                    .record(minecart, player.getUUID());
         }
     }
 }

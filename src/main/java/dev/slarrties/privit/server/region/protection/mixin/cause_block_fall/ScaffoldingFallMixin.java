@@ -6,11 +6,11 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.tracking.context.BlockFallContext;
 import dev.slarrties.privit.server.tracking.protection.BlockFallOriginTracker;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.ScaffoldingBlock;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.ScaffoldingBlock;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -24,33 +24,30 @@ import java.util.UUID;
 @Mixin(ScaffoldingBlock.class)
 public abstract class ScaffoldingFallMixin {
 
-    @Inject(method = "scheduledTick", at = @At("HEAD"))
-    private void markScaffoldingFall(BlockState state, ServerWorld serverWorld, BlockPos pos,
-                                     Random random, CallbackInfo ci) {
-        UUID uuid = resolve(serverWorld, pos);
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void markScaffoldingFall(BlockState state, ServerLevel level, BlockPos pos,
+                                     RandomSource random, CallbackInfo ci) {
+        UUID uuid = resolve(level, pos);
         if (uuid == null) return;
 
-        BlockFallOriginTracker blockFallTracker = WorldRegistry.get(serverWorld)
+        BlockFallOriginTracker blockFallTracker = WorldRegistry.get(level)
                 .getTrackerManager()
                 .getBlockFallOriginTracker();
         blockFallTracker.record(pos, uuid);
         BlockFallContext.push(uuid, pos);
     }
 
-    @Inject(method = "scheduledTick", at = @At("RETURN"))
-    private void popScaffoldingFall(BlockState state, ServerWorld world, BlockPos pos,
-                                    Random random, CallbackInfo ci) {
+    @Inject(method = "tick", at = @At("RETURN"))
+    private void popScaffoldingFall(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo ci) {
         BlockFallContext.pop();
     }
 
     @Unique
-    private static UUID resolve(ServerWorld serverWorld, BlockPos pos) {
+    private static UUID resolve(ServerLevel level, BlockPos pos) {
         BlockFallContext ctx = BlockFallContext.getCurrent();
-        if (ctx != null && ctx.getResponsible() != null) {
-            return ctx.getResponsible();
-        }
+        if (ctx != null && ctx.getResponsible() != null) return ctx.getResponsible();
 
-        return WorldRegistry.get(serverWorld)
+        return WorldRegistry.get(level)
                 .getTrackerManager()
                 .getBlockFallOriginTracker()
                 .getResponsible(pos);

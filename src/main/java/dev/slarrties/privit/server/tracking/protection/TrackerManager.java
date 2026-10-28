@@ -6,9 +6,9 @@ import dev.slarrties.privit.server.tracking.origin.EntityOriginTracker;
 import dev.slarrties.privit.server.tracking.origin.AbstractEntityOriginTracker;
 import dev.slarrties.privit.server.tracking.redstone.RedstoneTraceService;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.server.level.ServerLevel;
 
 import java.util.List;
 import java.util.UUID;
@@ -18,7 +18,7 @@ public final class TrackerManager {
 
     private static final int CLEANUP_INTERVAL_TICKS = 12000; // ~10 min
 
-    private final ServerWorld world;
+    private final ServerLevel level;
     private final TrackerNbtPersistence trackerStorage;
     private final List<OriginTracker> allTrackers = new ArrayList<>();
     private final List<AbstractEntityOriginTracker> entityTrackers;
@@ -43,26 +43,26 @@ public final class TrackerManager {
     private final BlockFallOriginTracker blockFallOriginTracker;
     private final RaidOriginTracker raidOriginTracker;
 
-    public TrackerManager(ServerWorld world) {
-        this.world = world;
-        this.trackerStorage = new TrackerNbtPersistence(world);
+    public TrackerManager(ServerLevel level) {
+        this.level = level;
+        this.trackerStorage = new TrackerNbtPersistence(level);
 
-        this.minecartOriginTracker = new MinecartOriginTracker(world);
-        this.explosionOriginTracker = new ExplosionOriginTracker(world);
-        this.boatOriginTracker = new BoatOriginTracker(world);
-        this.lightningOriginTracker = new LightningOriginTracker(world);
-        this.minecartFuelTracker = new MinecartFuelTracker(world);
-        this.fireOriginTracker = new FireOriginTracker(world);
-        this.redstoneOriginTracker = new RedstoneOriginTracker(world);
+        this.minecartOriginTracker = new MinecartOriginTracker(level);
+        this.explosionOriginTracker = new ExplosionOriginTracker(level);
+        this.boatOriginTracker = new BoatOriginTracker(level);
+        this.lightningOriginTracker = new LightningOriginTracker(level);
+        this.minecartFuelTracker = new MinecartFuelTracker(level);
+        this.fireOriginTracker = new FireOriginTracker(level);
+        this.redstoneOriginTracker = new RedstoneOriginTracker(level);
         this.witherPlacerTracker = new WitherPlacerTracker();
         this.netherPortalEntryTracker = new NetherPortalEntryTracker();
-        this.influencedEntityTracker = new InfluencedEntityTracker(world);
-        this.fluidOriginTracker = new FluidOriginTracker(world);
-        this.iceOriginTracker = new IceOriginTracker(world);
-        this.heatSourceOriginTracker = new HeatSourceOriginTracker(world);
-        this.campfireOriginTracker = new CampfireOriginTracker(world);
-        this.blockFallOriginTracker = new BlockFallOriginTracker(world);
-        this.raidOriginTracker = new RaidOriginTracker(world);
+        this.influencedEntityTracker = new InfluencedEntityTracker(level);
+        this.fluidOriginTracker = new FluidOriginTracker(level);
+        this.iceOriginTracker = new IceOriginTracker(level);
+        this.heatSourceOriginTracker = new HeatSourceOriginTracker(level);
+        this.campfireOriginTracker = new CampfireOriginTracker(level);
+        this.blockFallOriginTracker = new BlockFallOriginTracker(level);
+        this.raidOriginTracker = new RaidOriginTracker(level);
 
         registerAll();
 
@@ -71,7 +71,7 @@ public final class TrackerManager {
                 .map(AbstractEntityOriginTracker.class::cast)
                 .toList();
 
-        this.redstoneTraceService = new RedstoneTraceService(redstoneOriginTracker, world);
+        this.redstoneTraceService = new RedstoneTraceService(redstoneOriginTracker, level);
 
         trackerStorage.load(this);
     }
@@ -161,12 +161,12 @@ public final class TrackerManager {
     public BlockFallOriginTracker getBlockFallOriginTracker() { return blockFallOriginTracker; }
     public RaidOriginTracker getRaidOriginTracker() { return raidOriginTracker; }
 
-    public NbtCompound saveToNbt() {
-        NbtCompound root = new NbtCompound();
+    public CompoundTag saveToNbt() {
+        CompoundTag root = new CompoundTag();
 
         for (OriginTracker tracker : allTrackers) {
             if (tracker.isPersistent()) {
-                NbtCompound data = tracker.toNbt();
+                CompoundTag data = tracker.toNbt();
                 if (!data.isEmpty()) {
                     root.put(tracker.getClass().getSimpleName(), data);
                 }
@@ -175,14 +175,14 @@ public final class TrackerManager {
         return root;
     }
 
-    public void loadFromNbt(NbtCompound root) {
+    public void loadFromNbt(CompoundTag root) {
         if (root == null) return;
 
         for (OriginTracker tracker : allTrackers) {
             if (tracker.isPersistent()) {
                 String key = tracker.getClass().getSimpleName();
                 if (root.contains(key)) {
-                    tracker.fromNbt(root.getCompound(key));
+                    tracker.fromNbt(root.getCompoundOrEmpty(key));
                 }
             }
         }

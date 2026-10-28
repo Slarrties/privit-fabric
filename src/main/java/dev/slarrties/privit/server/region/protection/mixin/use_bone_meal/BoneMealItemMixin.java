@@ -8,15 +8,15 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.context.BoneMealUseContext;
 
-import net.minecraft.world.World;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.BoneMealItem;
-import net.minecraft.item.ItemUsageContext;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.Direction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.BoneMealItem;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -30,40 +30,40 @@ import java.util.UUID;
 @Mixin(BoneMealItem.class)
 public abstract class BoneMealItemMixin {
 
-    @Inject(method = "useOnBlock", at = @At("HEAD"))
-    private void pushBoneMealContext(ItemUsageContext context, CallbackInfoReturnable<ActionResult> cir) {
-        if (context.getWorld().isClient()) return;
-        if (!(context.getPlayer() instanceof ServerPlayerEntity player)) return;
-        BoneMealUseContext.push(player.getUuid(), context.getBlockPos());
+    @Inject(method = "useOn", at = @At("HEAD"))
+    private void pushBoneMealContext(UseOnContext context, CallbackInfoReturnable<InteractionResult> cir) {
+        if (context.getLevel().isClientSide()) return;
+        if (!(context.getPlayer() instanceof ServerPlayer player)) return;
+        BoneMealUseContext.push(player.getUUID(), context.getClickedPos());
     }
 
-    @Inject(method = "useOnBlock", at = @At("RETURN"))
-    private void popBoneMealContext(ItemUsageContext context, CallbackInfoReturnable<ActionResult> cir) {
+    @Inject(method = "useOn", at = @At("RETURN"))
+    private void popBoneMealContext(UseOnContext context, CallbackInfoReturnable<InteractionResult> cir) {
         BoneMealUseContext.pop();
     }
 
-    @Inject(method = "useOnFertilizable", at = @At("HEAD"), cancellable = true)
-    private static void preventFertilizable(ItemStack stack, World world, BlockPos pos,
+    @Inject(method = "growCrop", at = @At("HEAD"), cancellable = true)
+    private static void preventFertilizable(ItemStack stack, Level level, BlockPos pos,
                                             CallbackInfoReturnable<Boolean> cir) {
-        denyIfTargetProtected(world, pos, cir);
+        denyIfTargetProtected(level, pos, cir);
     }
 
-    @Inject(method = "useOnGround", at = @At("HEAD"), cancellable = true)
-    private static void preventGround(ItemStack stack, World world, BlockPos pos, Direction facing,
+    @Inject(method = "growWaterPlant", at = @At("HEAD"), cancellable = true)
+    private static void preventGround(ItemStack stack, Level level, BlockPos pos, Direction facing,
                                       CallbackInfoReturnable<Boolean> cir) {
-        denyIfTargetProtected(world, pos, cir);
+        denyIfTargetProtected(level, pos, cir);
     }
 
     @Unique
-    private static void denyIfTargetProtected(World world, BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
-        if (world.isClient() || !(world instanceof ServerWorld serverWorld)) return;
+    private static void denyIfTargetProtected(Level level, BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
+        if (level.isClientSide() || !(level instanceof ServerLevel serverLevel)) return;
 
         BoneMealUseContext ctx = BoneMealUseContext.getCurrent();
         if (ctx == null || ctx.getResponsible() == null) return;
 
         UUID uuid = ctx.getResponsible();
-        if (RegionPermissionChecker.isAllowed(uuid, Rule.USE_BONE_MEAL, pos, serverWorld)) return;
-        if (serverWorld.getServer().getPlayerManager().getPlayer(uuid) instanceof ServerPlayerEntity player) {
+        if (RegionPermissionChecker.isAllowed(uuid, Rule.USE_BONE_MEAL, pos, serverLevel)) return;
+        if (serverLevel.getServer().getPlayerList().getPlayer(uuid) instanceof ServerPlayer player) {
             PlayerNotification.trySend(player, NotificationType.DENY_USE_BONE_MEAL, Color.RED);
         }
 

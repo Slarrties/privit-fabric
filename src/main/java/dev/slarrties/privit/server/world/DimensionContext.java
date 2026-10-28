@@ -6,17 +6,17 @@ import dev.slarrties.privit.server.region.gui.RegionGuiSessions;
 import dev.slarrties.privit.server.region.grid.RegionGridSubscriptions;
 import dev.slarrties.privit.server.tracking.protection.TrackerManager;
 
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.level.ServerLevel;
 
 public final class DimensionContext {
 
-    private final ServerWorld world;
+    private final ServerLevel world;
     private final RegionManager regionManager;
     private final TrackerManager trackerManager;
     private final RegionGuiSessions regionGuiSessions;
     private final RegionGridSubscriptions gridSubscriptions;
 
-    public DimensionContext(ServerWorld world) {
+    public DimensionContext(ServerLevel world) {
         this.world = world;
         this.regionManager = new RegionManager(world);
         this.trackerManager = new TrackerManager(world);

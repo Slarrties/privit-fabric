@@ -2,28 +2,22 @@ package dev.slarrties.privit.common.network.payload.s2c;
 
 import dev.slarrties.privit.PrivitMod;
 
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 import java.util.UUID;
 
-public record RegionGuiCloseS2CPacket(UUID regionId) implements CustomPayload {
+public record RegionGuiCloseS2CPacket(UUID regionId) implements CustomPacketPayload {
+    public static final Type<RegionGuiCloseS2CPacket> TYPE = new Type<>(PrivitMod.id("region_gui_close_s2c"));
 
-    public static final Id<RegionGuiCloseS2CPacket> ID = new Id<>(PrivitMod.id("region_gui_close_s2c"));
-    public static final PacketCodec<PacketByteBuf, RegionGuiCloseS2CPacket> CODEC =
-            PacketCodec.of(RegionGuiCloseS2CPacket::write, RegionGuiCloseS2CPacket::read);
-
-    private void write(PacketByteBuf buf) {
-        buf.writeUuid(regionId);
-    }
-
-    private static RegionGuiCloseS2CPacket read(PacketByteBuf buf) {
-        return new RegionGuiCloseS2CPacket(buf.readUuid());
-    }
+    public static final StreamCodec<FriendlyByteBuf, RegionGuiCloseS2CPacket> CODEC = StreamCodec.of(
+            (FriendlyByteBuf buf, RegionGuiCloseS2CPacket packet) -> buf.writeUUID(packet.regionId),
+            buf -> new RegionGuiCloseS2CPacket(buf.readUUID())
+    );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

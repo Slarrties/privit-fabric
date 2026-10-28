@@ -7,15 +7,9 @@
     "CC "
   ],
   "key": {
-    "A": {
-      "item": "minecraft:paper"
-    },
-    "B": {
-      "item": "minecraft:book"
-    },
-    "C": {
-      "tag": "minecraft:planks"
-    }
+    "A": "minecraft:paper",
+    "B": "minecraft:book",
+    "C": "#minecraft:planks"
   },
   "result": {
     "id": "privit:region_table",

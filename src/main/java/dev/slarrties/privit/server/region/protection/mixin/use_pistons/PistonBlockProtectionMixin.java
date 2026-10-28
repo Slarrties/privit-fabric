@@ -12,15 +12,15 @@ import dev.slarrties.privit.server.tracking.context.PistonMovementContext;
 import dev.slarrties.privit.server.tracking.protection.BlockFallOriginTracker;
 import dev.slarrties.privit.server.tracking.redstone.handler.RedstoneReceiverHandler;
 
-import net.minecraft.world.World;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.PistonBlock;
-import net.minecraft.block.piston.PistonHandler;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.piston.PistonBaseBlock;
+import net.minecraft.world.level.block.piston.PistonStructureResolver;
 
 import com.llamalad7.mixinextras.sugar.Local;
 import org.spongepowered.asm.mixin.Final;
@@ -34,21 +34,22 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.UUID;
 
 @AssociatedRule({Rule.USE_PISTONS, Rule.CAUSE_BLOCK_FALL})
-@Mixin(PistonBlock.class)
+@Mixin(PistonBaseBlock.class)
 public abstract class PistonBlockProtectionMixin {
 
-    @Final @Shadow private boolean sticky;
+    @Final @Shadow
+    private boolean isSticky;
 
-    @Inject(method = "onSyncedBlockEvent", at = @At("HEAD"), cancellable = true)
-    private void handlePistonSyncedBlockEvent(BlockState state, World world, BlockPos pos, int type, int data,
+    @Inject(method = "triggerEvent", at = @At("HEAD"), cancellable = true)
+    private void handlePistonSyncedBlockEvent(BlockState state, Level level, BlockPos pos, int b0, int b1,
                                               CallbackInfoReturnable<Boolean> cir) {
-        if (world.isClient() || !(world instanceof ServerWorld serverWorld)) return;
-        if (type == 0 || type == 1 || type == 2) {
-            UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverWorld, pos);
+        if (level.isClientSide() || !(level instanceof ServerLevel serverLevel)) return;
 
+        if (b0 == 0 || b0 == 1 || b0 == 2) {
+            UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverLevel, pos);
             if (responsible != null) {
                 PistonMovementContext.push(responsible, pos);
-                BlockFallOriginTracker blockFallTracker = WorldRegistry.get(serverWorld)
+                BlockFallOriginTracker blockFallTracker = WorldRegistry.get(serverLevel)
                         .getTrackerManager()
                         .getBlockFallOriginTracker();
                 blockFallTracker.record(pos, responsible);
@@ -56,11 +57,11 @@ public abstract class PistonBlockProtectionMixin {
             }
         }
 
-        if ((type == 1 || type == 2) && this.sticky) {
-            Direction dir = state.get(PistonBlock.FACING);
-            BlockPos pulledPos = pos.offset(dir).offset(dir);
-            UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverWorld, pos);
+        if ((b0 == 1 || b0 == 2) && this.isSticky) {
+            Direction dir = state.getValue(PistonBaseBlock.FACING);
+            BlockPos pulledPos = pos.relative(dir).relative(dir);
 
+            UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverLevel, pos);
             if (responsible == null) {
                 PistonMovementContext context = PistonMovementContext.getCurrent();
                 if (context != null) {
@@ -68,46 +69,49 @@ public abstract class PistonBlockProtectionMixin {
                 }
             }
 
-            if (!RegionPermissionChecker.isAllowed(responsible, Rule.USE_PISTONS, pulledPos, serverWorld)) {
-                denyRetraction(serverWorld, pos, state, responsible);
+            if (responsible != null && !RegionPermissionChecker.isAllowed(responsible, Rule.USE_PISTONS, pulledPos, serverLevel)) {
+                denyRetraction(serverLevel, pos, state, responsible);
                 cir.setReturnValue(false);
             }
         }
     }
 
+
     @Inject(
-            method = "move",
+            method = "moveBlocks",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/block/piston/PistonHandler;calculatePush()Z",
+                    target = "Lnet/minecraft/world/level/block/piston/PistonStructureResolver;resolve()Z",
                     shift = At.Shift.AFTER
             ),
             cancellable = true
     )
-    private void checkPistonMovement(World world, BlockPos pos, Direction dir, boolean retract,
+    private void checkPistonMovement(Level level, BlockPos pistonPos, Direction direction, boolean extending,
                                      CallbackInfoReturnable<Boolean> cir,
-                                     @Local(ordinal = 0) PistonHandler pistonHandler) {
-        if (world.isClient() || !(world instanceof ServerWorld serverWorld)) return;
+                                     @Local(ordinal = 0) PistonStructureResolver resolver) {
+        if (level.isClientSide() || !(level instanceof ServerLevel serverLevel)) return;
 
         PistonMovementContext context = PistonMovementContext.getCurrent();
         if (context == null) return;
 
         UUID responsible = context.getResponsible();
         if (responsible == null) return;
-        if (!retract) return;
+        if (extending) return;
 
-        BlockPos headTarget = pos.offset(dir);
-        if (!RegionPermissionChecker.isAllowed(responsible, Rule.USE_PISTONS, headTarget, serverWorld)) {
-            denyMovement(serverWorld, pos, responsible);
+        BlockPos headTarget = pistonPos.relative(direction);
+        if (!RegionPermissionChecker.isAllowed(responsible, Rule.USE_PISTONS, headTarget, serverLevel)) {
+            denyMovement(serverLevel, pistonPos, responsible);
             cir.setReturnValue(false);
             return;
         }
 
-        if (pistonHandler != null && pistonHandler.calculatePush()) {
-            for (BlockPos movedPos : pistonHandler.getMovedBlocks()) {
-                BlockPos destination = movedPos.offset(dir);
-                if (!RegionPermissionChecker.isAllowed(responsible, Rule.USE_PISTONS, destination, serverWorld)) {
-                    denyMovement(serverWorld, pos, responsible);
+        if (resolver != null && resolver.resolve()) {
+            Direction pushDirection = direction.getOpposite();
+
+            for (BlockPos movedPos : resolver.getToPush()) {
+                BlockPos destination = movedPos.relative(pushDirection);
+                if (!RegionPermissionChecker.isAllowed(responsible, Rule.USE_PISTONS, destination, serverLevel)) {
+                    denyMovement(serverLevel, pistonPos, responsible);
                     cir.setReturnValue(false);
                     return;
                 }
@@ -116,73 +120,75 @@ public abstract class PistonBlockProtectionMixin {
     }
 
     @Inject(
-            method = "move",
+            method = "moveBlocks",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/block/piston/PistonHandler;calculatePush()Z",
+                    target = "Lnet/minecraft/world/level/block/piston/PistonStructureResolver;resolve()Z",
                     shift = At.Shift.AFTER
             )
     )
-    private void markFallFromPiston(World world, BlockPos pos, Direction dir, boolean retract,
+    private void markFallFromPiston(Level level, BlockPos pistonPos, Direction direction, boolean extending,
                                     CallbackInfoReturnable<Boolean> cir,
-                                    @Local(ordinal = 0) PistonHandler pistonHandler) {
-        if (world.isClient() || !(world instanceof ServerWorld serverWorld)) return;
+                                    @Local(ordinal = 0) PistonStructureResolver resolver) {
+        if (level.isClientSide() || !(level instanceof ServerLevel serverLevel)) return;
 
         PistonMovementContext context = PistonMovementContext.getCurrent();
         if (context == null || context.getResponsible() == null) return;
-        if (pistonHandler == null) return;
+        if (resolver == null) return;
 
         UUID uuid = context.getResponsible();
-        BlockFallOriginTracker blockFallTracker = WorldRegistry.get(serverWorld)
+        BlockFallOriginTracker blockFallTracker = WorldRegistry.get(serverLevel)
                 .getTrackerManager()
                 .getBlockFallOriginTracker();
+        Direction pushDirection = extending ? direction : direction.getOpposite();
 
-        for (BlockPos movedPos : pistonHandler.getMovedBlocks()) {
+        for (BlockPos movedPos : resolver.getToPush()) {
             blockFallTracker.record(movedPos, uuid);
-            blockFallTracker.record(movedPos.offset(dir), uuid);
+            blockFallTracker.record(movedPos.relative(pushDirection), uuid);
         }
 
-        for (BlockPos brokenPos : pistonHandler.getBrokenBlocks()) {
+        for (BlockPos brokenPos : resolver.getToDestroy()) {
             blockFallTracker.record(brokenPos, uuid);
         }
     }
 
-    @Inject(method = "onSyncedBlockEvent", at = @At("RETURN"))
-    private void popPistonContext(BlockState state, World world, BlockPos pos, int type, int data,
+    @Inject(method = "triggerEvent", at = @At("RETURN"))
+    private void popPistonContext(BlockState state, Level level, BlockPos pos, int b0, int b1,
                                   CallbackInfoReturnable<Boolean> cir) {
-        if (world.isClient()) return;
-
-        if (type == 0 || type == 1 || type == 2) {
+        if (level.isClientSide()) return;
+        if (b0 == 0 || b0 == 1 || b0 == 2) {
             PistonMovementContext.pop();
             BlockFallContext.pop();
         }
     }
 
     @Unique
-    private void denyMovement(ServerWorld serverWorld, BlockPos pos, UUID playerUuid) {
-        BlockState state = serverWorld.getBlockState(pos);
-        serverWorld.setBlockState(pos, state.with(PistonBlock.EXTENDED, false), 3);
-        serverWorld.updateListeners(pos, state, state, 3);
-        ServerPlayerEntity serverPlayer = serverWorld.getServer()
-                .getPlayerManager()
+    private void denyMovement(ServerLevel serverLevel, BlockPos pos, UUID playerUuid) {
+        BlockState state = serverLevel.getBlockState(pos);
+
+        serverLevel.setBlock(pos, state.setValue(PistonBaseBlock.EXTENDED, false), 3);
+        serverLevel.sendBlockUpdated(pos, state, state, 3);
+
+        ServerPlayer serverPlayer = serverLevel.getServer()
+                .getPlayerList()
                 .getPlayer(playerUuid);
         PlayerNotification.trySend(serverPlayer, NotificationType.DENY_USE_PISTON, Color.RED);
     }
 
     @Unique
-    private void denyRetraction(ServerWorld serverWorld, BlockPos pos, BlockState state, UUID playerUuid) {
-        Direction dir = state.get(PistonBlock.FACING);
-        BlockState retractedState = state.with(PistonBlock.EXTENDED, false);
-        serverWorld.setBlockState(pos, retractedState, 3);
-        BlockPos headPos = pos.offset(dir);
+    private void denyRetraction(ServerLevel serverLevel, BlockPos pos, BlockState state, UUID playerUuid) {
+        Direction dir = state.getValue(PistonBaseBlock.FACING);
+        BlockState retractedState = state.setValue(PistonBaseBlock.EXTENDED, false);
+        serverLevel.setBlock(pos, retractedState, 3);
 
-        if (serverWorld.getBlockState(headPos).isOf(Blocks.MOVING_PISTON)) {
-            serverWorld.removeBlock(headPos, false);
+        BlockPos headPos = pos.relative(dir);
+        if (serverLevel.getBlockState(headPos).is(Blocks.MOVING_PISTON)) {
+            serverLevel.removeBlock(headPos, false);
         }
+        serverLevel.sendBlockUpdated(pos, state, retractedState, 3);
 
-        serverWorld.updateListeners(pos, state, retractedState, 3);
-        ServerPlayerEntity serverPlayer = serverWorld.getServer()
-                .getPlayerManager()
+        ServerPlayer serverPlayer = serverLevel.getServer()
+                .getPlayerList()
                 .getPlayer(playerUuid);
         PlayerNotification.trySend(serverPlayer, NotificationType.DENY_USE_PISTON, Color.RED);
         PistonMovementContext.pop();

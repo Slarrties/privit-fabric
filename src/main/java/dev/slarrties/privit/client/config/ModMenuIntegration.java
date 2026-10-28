@@ -12,9 +12,8 @@ public final class ModMenuIntegration implements ModMenuApi {
 
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
-        if (isClothConfigLoaded()) {
-            return new ClothConfigScreenFactory();
-        }
+        if (isClothConfigLoaded()) return new ClothConfigScreenFactory();
+
         return MissingClothConfigScreen::new;
     }
 

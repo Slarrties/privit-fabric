@@ -10,13 +10,13 @@ import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.protection.BoatOriginTracker;
 import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.block.BlockState;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.vehicle.BoatEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.vehicle.boat.Boat;
+import net.minecraft.world.entity.vehicle.boat.AbstractBoat;
+import net.minecraft.world.level.block.state.BlockState;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -27,45 +27,40 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.UUID;
 
 @AssociatedRule(Rule.INTERACT_WITH_BOATS)
-@Mixin(BoatEntity.class)
+@Mixin(AbstractBoat.class)
 public abstract class InteractBoatMixin {
 
-    @Inject(method = "pushAwayFrom", at = @At("HEAD"), cancellable = true)
-    private void onBoatPushAwayFrom(Entity pusher, CallbackInfo ci) {
-        BoatEntity boat = (BoatEntity) (Object) this;
+    @Inject(method = "push", at = @At("HEAD"), cancellable = true)
+    private void onBoatPush(Entity pusher, CallbackInfo ci) {
+        AbstractBoat boat = (AbstractBoat) (Object) this;
+        if (boat.level().isClientSide()) return;
 
-        if (boat.getWorld().isClient) return;
-        if (pusher.getWorld() instanceof ServerWorld serverWorld) {
-            BoatOriginTracker boatOriginTracker = WorldRegistry.get(serverWorld)
-                    .getTrackerManager()
-                    .getBoatOriginTracker();
-            boolean boatHasPassengers = boat.hasPassengers();
+        if (pusher.level() instanceof ServerLevel serverLevel) {
+            BoatOriginTracker boatOriginTracker = WorldRegistry.get(serverLevel).getTrackerManager().getBoatOriginTracker();
+            boolean boatHasPassengers = !boat.getPassengers().isEmpty();
 
-            if (pusher instanceof ServerPlayerEntity serverPlayer) {
-                boolean hasPermission = RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_BOATS, boat.getBlockPos());
+            if (pusher instanceof ServerPlayer serverPlayer) {
+                boolean hasPermission = RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.INTERACT_WITH_BOATS, boat.blockPosition(), serverLevel);
+                if (boatHasPassengers) propogateResponsibleToEntity(serverPlayer.getUUID());
 
-                if (boatHasPassengers) propogateResponsibleToEntity(serverPlayer.getUuid());
                 if (!hasPermission) {
                     PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_BOAT, Color.RED);
-                    boat.setVelocity(0.0, boat.getVelocity().y, 0.0);
+                    boat.setDeltaMovement(0.0, boat.getDeltaMovement().y, 0.0);
                     ci.cancel();
                     return;
                 }
-
-                boatOriginTracker.record(boat, serverPlayer.getUuid());
+                boatOriginTracker.record(boat, serverPlayer.getUUID());
                 return;
             }
 
-            if (pusher instanceof BoatEntity pusherBoat) {
+            if (pusher instanceof Boat pusherBoat) {
                 boatOriginTracker.propagate(pusherBoat, boat);
-                UUID responsible = boatOriginTracker.getResponsiblePlayer(boat);
-
+                UUID responsible = boatOriginTracker.getResponsible(boat);
                 if (responsible != null) {
-                    boolean forbidden = !RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_BOATS, boat.getBlockPos(), serverWorld);
-
+                    boolean forbidden = !RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_BOATS, boat.blockPosition(), serverLevel);
                     if (boatHasPassengers) propogateResponsibleToEntity(responsible);
                     if (forbidden) {
-                        destroyIllegalBoat(boat, responsible, serverWorld);
+                        destroyIllegalBoat(boat, responsible, serverLevel);
                         ci.cancel();
                     }
                 }
@@ -73,32 +68,30 @@ public abstract class InteractBoatMixin {
         }
     }
 
-    @Inject(method = "updateVelocity", at = @At("HEAD"))
+    // TODO: updateVelocity in Entity class
+    @Inject(method = "tick", at = @At("HEAD"))
     private void checkBoatMovement(CallbackInfo ci) {
-        BoatEntity boat = (BoatEntity) (Object) this;
-        if (boat.getWorld().isClient) return;
-        if (boat.getVelocity().horizontalLengthSquared() < 0.0025) return;
-
+        AbstractBoat boat = (AbstractBoat) (Object) this;
+        if (boat.level().isClientSide()) return;
+        if (boat.getDeltaMovement().horizontalDistanceSqr() < 0.0025) return;
         checkAndRemoveIfNotAllowed();
     }
 
-    @Inject(method = "fall", at = @At("HEAD"))
+    @Inject(method = "checkFallDamage", at = @At("HEAD"))
     private void checkBoatFall(double heightDifference, boolean onGround, BlockState state, BlockPos landedPosition, CallbackInfo ci) {
-        BoatEntity boat = (BoatEntity) (Object) this;
-        if (boat.getWorld().isClient) return;
-
+        AbstractBoat boat = (AbstractBoat) (Object) this;
+        if (boat.level().isClientSide()) return;
         checkAndRemoveIfNotAllowed();
     }
 
     @Unique
     private void propogateResponsibleToEntity(UUID responsible) {
-        BoatEntity boat = (BoatEntity) (Object) this;
+        AbstractBoat boat = (AbstractBoat) (Object) this;
+        if (boat.level() instanceof ServerLevel serverLevel) {
+            InfluencedEntityTracker entityTracker = WorldRegistry.get(serverLevel).getTrackerManager().getInfluencedEntityTracker();
 
-        if(boat.getWorld() instanceof ServerWorld serverWorld) {
-            InfluencedEntityTracker entityTracker = WorldRegistry.get(serverWorld).getTrackerManager().getInfluencedEntityTracker();
-
-            for (Entity entity : boat.getPassengerList()) {
-                if (!(entity instanceof ServerPlayerEntity)) {
+            for (Entity entity : boat.getPassengers()) {
+                if (!(entity instanceof ServerPlayer)) {
                     entityTracker.record(entity, responsible);
                 }
             }
@@ -107,32 +100,25 @@ public abstract class InteractBoatMixin {
 
     @Unique
     private void checkAndRemoveIfNotAllowed() {
-        BoatEntity boat = (BoatEntity) (Object) this;
-
-        if(boat.getWorld() instanceof ServerWorld serverWorld) {
-            BoatOriginTracker boatOriginTracker = WorldRegistry.get(serverWorld).getTrackerManager().getBoatOriginTracker();
-            UUID responsible = boatOriginTracker.getResponsiblePlayer(boat);
-
+        AbstractBoat boat = (AbstractBoat) (Object) this;
+        if (boat.level() instanceof ServerLevel serverLevel) {
+            BoatOriginTracker boatOriginTracker = WorldRegistry.get(serverLevel).getTrackerManager().getBoatOriginTracker();
+            UUID responsible = boatOriginTracker.getResponsible(boat);
             if (responsible == null) return;
-            if (!RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_BOATS, boat.getBlockPos(), serverWorld)) {
-                destroyIllegalBoat(boat, responsible, serverWorld);
+            if (!RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_BOATS, boat.blockPosition(), serverLevel)) {
+                destroyIllegalBoat(boat, responsible, serverLevel);
             }
         }
     }
 
     @Unique
-    private void destroyIllegalBoat(BoatEntity boat, UUID player, ServerWorld serverWorld) {
-        boat.removeAllPassengers();
-
-        ItemStack boatItem = boat.asItem().getDefaultStack();
-        boat.dropStack(boatItem);
+    private void destroyIllegalBoat(AbstractBoat boat, UUID player, ServerLevel serverLevel) {
+        boat.ejectPassengers();
+//        ItemStack boatItem = boat.getPickResult();
+//        boat.spawnAtLocation(boatItem);
         boat.discard();
-
-        ServerPlayerEntity serverPlayer = serverWorld.getServer().getPlayerManager().getPlayer(player);
+        ServerPlayer serverPlayer = serverLevel.getServer().getPlayerList().getPlayer(player);
         PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_BOAT, Color.RED);
-        WorldRegistry.get(serverWorld)
-                .getTrackerManager()
-                .getBoatOriginTracker()
-                .remove(boat);
+        WorldRegistry.get(serverLevel).getTrackerManager().getBoatOriginTracker().remove(boat);
     }
 }

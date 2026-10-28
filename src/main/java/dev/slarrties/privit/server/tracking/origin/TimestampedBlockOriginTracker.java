@@ -1,8 +1,8 @@
 package dev.slarrties.privit.server.tracking.origin;
 
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -15,25 +15,22 @@ public abstract class TimestampedBlockOriginTracker extends AbstractBlockOriginT
 
     protected final ConcurrentHashMap<Long, ResponsibleTimestamp> records = new ConcurrentHashMap<>();
 
-    protected TimestampedBlockOriginTracker(ServerWorld world) {
-        super(world);
+    protected TimestampedBlockOriginTracker(ServerLevel level) {
+        super(level);
     }
 
     @Override
     public void record(BlockPos pos, UUID playerUuid) {
-        if (pos == null || playerUuid == null || world.isClient) return;
-
-        records.put(pos.asLong(), new ResponsibleTimestamp(playerUuid, world.getTime()));
+        if (pos == null || playerUuid == null || level.isClientSide()) return;
+        records.put(pos.asLong(), new ResponsibleTimestamp(playerUuid, level.getGameTime()));
         super.record(pos, playerUuid);
     }
 
     @Override
     public void propagate(BlockPos from, BlockPos to) {
-        if (from == null || to == null || world.isClient) return;
-
+        if (from == null || to == null || level.isClientSide()) return;
         ResponsibleTimestamp record = records.get(from.asLong());
         if (record == null) return;
-
         records.put(to.asLong(), record);
         super.record(to, record.owner());
     }
@@ -52,17 +49,17 @@ public abstract class TimestampedBlockOriginTracker extends AbstractBlockOriginT
     }
 
     @Nullable
-    public TimestampedBlockOriginTracker.ResponsibleTimestamp getResponsibleTimestamp(BlockPos pos) {
-        if (pos == null || world.isClient) return null;
+    public ResponsibleTimestamp getResponsibleTimestamp(BlockPos pos) {
+        if (pos == null || level.isClientSide()) return null;
         return records.get(pos.asLong());
     }
 
     @Override
-    public NbtCompound toNbt() {
-        NbtCompound tag = new NbtCompound();
+    public CompoundTag toNbt() {
+        CompoundTag tag = new CompoundTag();
         for (var entry : records.entrySet()) {
-            NbtCompound recordTag = new NbtCompound();
-            recordTag.putUuid("owner", entry.getValue().owner());
+            CompoundTag recordTag = new CompoundTag();
+            recordTag.putString("owner", entry.getValue().owner().toString());
             recordTag.putLong("time", entry.getValue().timestamp());
             tag.put(Long.toString(entry.getKey()), recordTag);
         }
@@ -70,19 +67,21 @@ public abstract class TimestampedBlockOriginTracker extends AbstractBlockOriginT
     }
 
     @Override
-    public void fromNbt(NbtCompound tag) {
+    public void fromNbt(CompoundTag tag) {
         records.clear();
         super.clearAll();
         if (tag == null) return;
-
-        for (String key : tag.getKeys()) {
+        for (String key : tag.keySet()) {
             try {
                 long posLong = Long.parseLong(key);
-                NbtCompound recordTag = tag.getCompound(key);
-                if (!recordTag.containsUuid("owner")) continue;
+                CompoundTag recordTag = tag.getCompoundOrEmpty(key);
 
-                UUID owner = recordTag.getUuid("owner");
-                long time = recordTag.contains("time") ? recordTag.getLong("time") : 0L;
+                String ownerStr = recordTag.getStringOr("owner", "");
+                if (ownerStr.isEmpty()) continue;
+
+                UUID owner = UUID.fromString(ownerStr);
+                long time = recordTag.getLongOr("time", 0L);
+
                 records.put(posLong, new ResponsibleTimestamp(owner, time));
                 this.responsible.put(posLong, owner);
             } catch (Exception ignored) {}

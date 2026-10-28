@@ -1,87 +1,92 @@
 package dev.slarrties.privit.common.block;
 
-import dev.slarrties.privit.common.network.payload.c2s.RegionGuiRequestC2SPacket;
+import com.mojang.serialization.MapCodec;
+
 import dev.slarrties.privit.common.network.payload.s2c.RegionGridStateS2CPacket;
+import dev.slarrties.privit.common.network.payload.c2s.RegionGuiRequestC2SPacket;
 import dev.slarrties.privit.server.world.WorldRegistry;
 
-import net.minecraft.world.World;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.HorizontalFacingBlock;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.BlockMirror;
-import net.minecraft.util.BlockRotation;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.state.StateManager;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import com.mojang.serialization.MapCodec;
 
 import java.util.UUID;
 
-public class RegionTableBlock extends HorizontalFacingBlock {
+public class RegionTableBlock extends HorizontalDirectionalBlock {
 
-    public RegionTableBlock(Settings settings) {
-        super(settings);
-        setDefaultState(getDefaultState().with(FACING, Direction.NORTH));
+    public static final MapCodec<RegionTableBlock> CODEC = simpleCodec(RegionTableBlock::new);
+
+    @Override
+    protected MapCodec<? extends HorizontalDirectionalBlock> codec() {
+        return CODEC;
+    }
+
+    public RegionTableBlock(Properties properties) {
+        super(properties);
+        this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
 
     @Override
-    protected MapCodec<? extends HorizontalFacingBlock> getCodec() {
-        return null;
-    }
-
-    @Override
-    protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(FACING);
     }
 
     @Override
-    public BlockState getPlacementState(ItemPlacementContext ctx) {
-        return this.getDefaultState().with(FACING, ctx.getHorizontalPlayerFacing().getOpposite());
+    public BlockState getStateForPlacement(BlockPlaceContext ctx) {
+        return this.defaultBlockState().setValue(FACING, ctx.getHorizontalDirection().getOpposite());
     }
 
     @Override
-    public BlockState rotate(BlockState state, BlockRotation rotation) {
-        return state.with(FACING, rotation.rotate(state.get(FACING)));
+    public BlockState rotate(BlockState state, Rotation rotation) {
+        return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
     }
 
     @Override
-    public BlockState mirror(BlockState state, BlockMirror mirror) {
-        return state.rotate(mirror.getRotation(state.get(FACING)));
+    public BlockState mirror(BlockState state, Mirror mirror) {
+        return state.rotate(mirror.getRotation(state.getValue(FACING)));
     }
 
     @Override
-    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
-        if (world.isClient) {
+    public InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
+        if (level.isClientSide()) {
             ClientPlayNetworking.send(new RegionGuiRequestC2SPacket(pos));
-            return ActionResult.SUCCESS;
+            return InteractionResult.SUCCESS;
         }
 
-        return ActionResult.SUCCESS;
+        return InteractionResult.SUCCESS;
     }
 
     @Override
-    public void onStateReplaced(BlockState state, World world, BlockPos pos, BlockState newState, boolean moved) {
-        if (!state.isOf(newState.getBlock()) && !world.isClient && world instanceof ServerWorld serverWorld) {
-            UUID regionId = WorldRegistry.get(serverWorld)
+    public void destroy(LevelAccessor level, BlockPos pos, BlockState state) {
+        if (!level.isClientSide() && level instanceof ServerLevel serverLevel) {
+            UUID regionId = WorldRegistry.get(serverLevel)
                     .getRegionGuiSessions()
                     .closePendingAt(pos);
 
             if (regionId != null) {
                 RegionGridStateS2CPacket packet = RegionGridStateS2CPacket.hide(regionId);
 
-                for (PlayerEntity player : world.getPlayers()) {
-                    ServerPlayNetworking.send((ServerPlayerEntity) player, packet);
+                for (Player p : serverLevel.players()) {
+                    ServerPlayNetworking.send((ServerPlayer) p, packet);
                 }
             }
         }
-        super.onStateReplaced(state, world, pos, newState, moved);
+
+        super.destroy(level, pos, state);
     }
 }

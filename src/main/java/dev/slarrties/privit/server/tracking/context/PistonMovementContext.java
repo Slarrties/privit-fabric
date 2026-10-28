@@ -1,7 +1,7 @@
 package dev.slarrties.privit.server.tracking.context;
 
 import java.util.UUID;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
 public final class PistonMovementContext {
 

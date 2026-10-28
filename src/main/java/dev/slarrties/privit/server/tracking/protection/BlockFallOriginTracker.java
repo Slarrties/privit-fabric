@@ -2,35 +2,24 @@ package dev.slarrties.privit.server.tracking.protection;
 
 import dev.slarrties.privit.server.tracking.origin.TimestampedBlockOriginTracker;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 
 import java.util.UUID;
 
 public final class BlockFallOriginTracker extends TimestampedBlockOriginTracker {
 
-    public BlockFallOriginTracker(ServerWorld world) {
-        super(world);
-    }
-
-    @Override
-    public void record(BlockPos pos, UUID playerUuid) {
-        if (pos == null || playerUuid == null) return;
-
-        super.record(pos, playerUuid);
-    }
+    public BlockFallOriginTracker(ServerLevel level) { super(level); }
 
     @Override
     public void onServerTick() {
         if (records.isEmpty()) return;
 
-        long expireBefore = world.getTime() - 10L;
+        long expireBefore = level.getGameTime() - 10L; // getTime()
         records.entrySet().removeIf(entry -> entry.getValue().timestamp() < expireBefore);
         this.responsible.entrySet().removeIf(entry -> !records.containsKey(entry.getKey()));
     }
 
     @Override
-    public boolean isPersistent() {
-        return false;
-    }
+    public boolean isPersistent() { return false; }
 }

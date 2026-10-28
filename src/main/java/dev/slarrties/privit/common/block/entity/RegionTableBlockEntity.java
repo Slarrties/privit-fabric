@@ -2,11 +2,11 @@ package dev.slarrties.privit.common.block.entity;
 
 import dev.slarrties.privit.common.registry.BlockEntityRegistry;
 
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.registry.RegistryWrapper.WrapperLookup;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.entity.BlockEntity;
 
 import java.util.UUID;
 
@@ -20,7 +20,7 @@ public class RegionTableBlockEntity extends BlockEntity {
 
     public void setRegionId(UUID id) {
         this.regionId = id;
-        markDirty();
+        setChanged();
     }
 
     public UUID getRegionId() {
@@ -32,16 +32,27 @@ public class RegionTableBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void writeNbt(NbtCompound nbt, WrapperLookup registryLookup) {
-        super.writeNbt(nbt, registryLookup);
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
         if (regionId != null) {
-            nbt.putUuid("RegionId", regionId);
+            output.putString("RegionId", regionId.toString());
         }
     }
 
     @Override
-    public void readNbt(NbtCompound nbt, WrapperLookup registryLookup) {
-        super.readNbt(nbt, registryLookup);
-        regionId = nbt.containsUuid("RegionId") ? nbt.getUuid("RegionId") : null;
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+
+        String uuidStr = input.getStringOr("RegionId", "");
+
+        if (!uuidStr.isEmpty()) {
+            try {
+                regionId = UUID.fromString(uuidStr);
+            } catch (IllegalArgumentException e) {
+                regionId = null;
+            }
+        } else {
+            regionId = null;
+        }
     }
 }

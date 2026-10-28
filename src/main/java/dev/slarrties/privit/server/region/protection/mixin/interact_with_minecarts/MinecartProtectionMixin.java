@@ -9,13 +9,12 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.tracking.protection.MinecartOriginTracker;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.item.Items;
-import net.minecraft.item.ItemStack;
-import net.minecraft.entity.vehicle.*;
-import net.minecraft.block.BlockState;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.entity.vehicle.minecart.*;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -26,54 +25,46 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.UUID;
 
 @AssociatedRule(Rule.INTERACT_WITH_MINECARTS)
-@Mixin(AbstractMinecartEntity.class)
+@Mixin(AbstractMinecart.class)
 public abstract class MinecartProtectionMixin {
 
-    @Inject(method = "moveOnRail", at = @At("HEAD"))
-    private void checkMinecartOnRail(BlockPos pos, BlockState state, CallbackInfo ci) {
-        checkAndRemoveIfNotAllowed();
-    }
-
-    @Inject(method = "moveOffRail", at = @At("HEAD"))
-    private void checkMinecartOffRail(CallbackInfo ci) {
+    // TODO: tick head
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void checkMinecartMovement(CallbackInfo ci) {
         checkAndRemoveIfNotAllowed();
     }
 
     @Unique
     private void checkAndRemoveIfNotAllowed() {
-        AbstractMinecartEntity minecart = (AbstractMinecartEntity) (Object) this;
-
-        if(minecart.getWorld() instanceof ServerWorld serverWorld) {
-            MinecartOriginTracker minecartOriginTracker = WorldRegistry.get(serverWorld)
+        AbstractMinecart minecart = (AbstractMinecart) (Object) this;
+        if (minecart.level() instanceof ServerLevel serverLevel) {
+            MinecartOriginTracker minecartOriginTracker = WorldRegistry.get(serverLevel)
                     .getTrackerManager()
                     .getMinecartOriginTracker();
-            UUID responsible = minecartOriginTracker.getResponsiblePlayer(minecart);
+            UUID responsible = minecartOriginTracker.getResponsible(minecart);
             if (responsible == null) return;
 
-            BlockPos currentPos = minecart.getBlockPos();
-            boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_MINECARTS, currentPos, serverWorld);
-
+            BlockPos currentPos = minecart.blockPosition();
+            boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_MINECARTS, currentPos, serverLevel);
             if (!allowed) {
                 ItemStack stack = getMinecartItemStack(minecart);
-
-                minecart.dropStack(stack);
-                minecart.discard();
-                minecartOriginTracker.remove(minecart);
-
-                ServerPlayerEntity serverPlayer = serverWorld.getServer().getPlayerManager().getPlayer(responsible);
+                ServerPlayer serverPlayer = serverLevel.getServer().getPlayerList().getPlayer(responsible);
                 PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_MINECART, Color.RED);
+
+                minecart.spawnAtLocation(serverLevel, stack);
+                minecartOriginTracker.remove(minecart);
+                minecart.discard();
             }
         }
     }
 
     @Unique
-    private ItemStack getMinecartItemStack(AbstractMinecartEntity minecart) {
-        if (minecart instanceof HopperMinecartEntity) return new ItemStack(Items.HOPPER_MINECART);
-        if (minecart instanceof ChestMinecartEntity) return new ItemStack(Items.CHEST_MINECART);
-        if (minecart instanceof FurnaceMinecartEntity) return new ItemStack(Items.FURNACE_MINECART);
-        if (minecart instanceof TntMinecartEntity) return new ItemStack(Items.TNT_MINECART);
-        if (minecart instanceof CommandBlockMinecartEntity) return new ItemStack(Items.COMMAND_BLOCK_MINECART);
-
+    private ItemStack getMinecartItemStack(AbstractMinecart minecart) {
+        if (minecart instanceof MinecartHopper) return new ItemStack(Items.HOPPER_MINECART);
+        if (minecart instanceof MinecartChest) return new ItemStack(Items.CHEST_MINECART);
+        if (minecart instanceof MinecartFurnace) return new ItemStack(Items.FURNACE_MINECART);
+        if (minecart instanceof MinecartTNT) return new ItemStack(Items.TNT_MINECART);
+        if (minecart instanceof MinecartCommandBlock) return new ItemStack(Items.COMMAND_BLOCK_MINECART);
         return new ItemStack(Items.MINECART);
     }
 }

@@ -4,9 +4,7 @@
 	"version": "${version}",
 	"name": "Privit",
 	"description": "Protect your territory",
-	"authors": [
-		"Slarrties"
-	],
+	"authors": ["Slarrties"],
 	"contact": {
 		"homepage": "https://modrinth.com/project/privit",
 		"sources": "https://github.com/Slarrties/privit-fabric"
@@ -15,16 +13,16 @@
 	"icon": "assets/privit/icon.png",
 	"environment": "*",
 	"entrypoints": {
-		"main": [ "dev.slarrties.privit.PrivitMod" ],
-		"client": [ "dev.slarrties.privit.client.PrivitClient" ],
+		"main": ["dev.slarrties.privit.PrivitMod"],
+		"client": ["dev.slarrties.privit.client.PrivitClient"],
 		"server": ["dev.slarrties.privit.server.PrivitServer"],
-		"modmenu": [ "dev.slarrties.privit.client.config.ModMenuIntegration" ]
+		"modmenu": ["dev.slarrties.privit.client.config.ModMenuIntegration"]
 	},
 	"mixins": ["privit.mixins.json"],
 	"depends": {
-		"fabricloader": ">=0.18.1",
-		"minecraft": "~1.21.1",
-		"java": ">=21",
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.1.2",
+		"java": ">=25",
 		"fabric-api": "*"
 	},
 	"suggests": {

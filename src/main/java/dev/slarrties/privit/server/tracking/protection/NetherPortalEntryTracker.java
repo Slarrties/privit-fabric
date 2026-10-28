@@ -2,8 +2,8 @@ package dev.slarrties.privit.server.tracking.protection;
 
 import dev.slarrties.privit.server.tracking.origin.OriginTracker;
 
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Map;
 import java.util.UUID;
@@ -16,16 +16,16 @@ public final class NetherPortalEntryTracker implements OriginTracker {
 
     private static final Map<UUID, Long> recentEntries = new ConcurrentHashMap<>();
 
-    public static void recordEntry(ServerPlayerEntity player) {
+    public static void recordEntry(ServerPlayer player) {
         if (player == null) return;
-        recentEntries.put(player.getUuid(), System.currentTimeMillis());
+        recentEntries.put(player.getUUID(), System.currentTimeMillis());
     }
 
-    public static ServerPlayerEntity getRecentPortalUser(ServerWorld world) {
-        if (world == null) return null;
+    public static ServerPlayer getRecentPortalUser(ServerLevel level) {
+        if (level == null) return null;
 
         long now = System.currentTimeMillis();
-        ServerPlayerEntity found = null;
+        ServerPlayer found = null;
 
         Iterator<Map.Entry<UUID, Long>> it = recentEntries.entrySet().iterator();
 
@@ -36,7 +36,7 @@ public final class NetherPortalEntryTracker implements OriginTracker {
                 continue;
             }
 
-            ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(entry.getKey());
+            ServerPlayer player = level.getServer().getPlayerList().getPlayer(entry.getKey());
             if (player != null && player.isAlive()) {
                 found = player;
                 break;

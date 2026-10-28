@@ -6,10 +6,10 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.ai.goal.BreakDoorGoal;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.goal.BreakDoorGoal;
+import net.minecraft.server.level.ServerLevel;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -22,32 +22,28 @@ import java.util.UUID;
 @Mixin(BreakDoorGoal.class)
 public abstract class BreakDoorGoalMixin {
 
-    // TODO: frequent calls from those who try to break down doors.
-    // shouldContinue() ???
-    // TODO: vindicators not only break down, but also open doors.
-    @Inject(method = "canStart", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "canUse", at = @At("RETURN"), cancellable = true)
     private void preventBreakingDoor(CallbackInfoReturnable<Boolean> cir) {
         if (!cir.getReturnValue()) return;
 
         DoorInteractGoalAccessor accessor = (DoorInteractGoalAccessor) (Object) this;
-        MobEntity mob = accessor.getMob();
+        Mob mob = accessor.getMob();
         BlockPos doorPos = accessor.getDoorPos();
 
-        if (mob.getWorld().isClient) return;
+        if (mob.level().isClientSide()) return;
+        if (!(mob.level() instanceof ServerLevel serverLevel)) return;
 
-        ServerWorld world = (ServerWorld) mob.getWorld();
-        InfluencedEntityTracker tracker = WorldRegistry.get(world)
+        InfluencedEntityTracker tracker = WorldRegistry.get(serverLevel)
                 .getTrackerManager()
                 .getInfluencedEntityTracker();
-
         UUID responsible = tracker.getResponsible(mob);
         if (responsible == null) return;
 
-        BlockPos checkPos = (doorPos != null && !doorPos.equals(BlockPos.ORIGIN))
+        BlockPos checkPos = (doorPos != null && !doorPos.equals(BlockPos.ZERO))
                 ? doorPos
-                : mob.getBlockPos();
+                : mob.blockPosition();
 
-        if (!RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_DOORS, checkPos, world)) {
+        if (!RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_DOORS, checkPos, serverLevel)) {
             cir.setReturnValue(false);
         }
     }

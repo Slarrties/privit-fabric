@@ -8,20 +8,21 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.protection.CampfireOriginTracker;
-
-import net.minecraft.block.BlockState;
-import net.minecraft.block.CampfireBlock;
-import net.minecraft.item.Items;
-import net.minecraft.potion.Potions;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.projectile.thrown.PotionEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.component.type.PotionContentsComponent;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.AbstractThrownPotion;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownSplashPotion;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.alchemy.Potions;
+import net.minecraft.world.level.block.CampfireBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -29,118 +30,81 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.util.Collection;
+
+// TODO
 @AssociatedRule({Rule.THROW_POTIONS, Rule.EXTINGUISH_FIRE})
-@Mixin(PotionEntity.class)
+@Mixin(ThrownSplashPotion.class)
 public abstract class SplashPotionMixin {
 
     @Unique
     private static final int POTION_EFFECT_RADIUS_CHECK = 4;
 
-    @Inject(method = "applySplashPotion", at = @At("HEAD"), cancellable = true)
-    private void cancelSplashInProtectedRegion(Iterable<StatusEffectInstance> effects, Entity entity, CallbackInfo ci) {
-        PotionEntity potion = (PotionEntity) (Object) this;
-        Entity owner = potion.getOwner();
-        if (!(owner instanceof ServerPlayerEntity thrower)) return;
-
-        Vec3d impactPos = potion.getPos();
-        boolean allowed = isPotionAreaSafe(thrower, impactPos);
-
-        if (!allowed) {
-            ci.cancel();
-            sendDenyNotification(thrower);
-        }
-    }
-
-    @Inject(method = "applyLingeringPotion", at = @At("HEAD"), cancellable = true)
-    private void cancelLingeringPotionInProtectedRegion(PotionContentsComponent potionContents, CallbackInfo ci) {
-        PotionEntity potion = (PotionEntity) (Object) this;
-        Entity owner = potion.getOwner();
-        if (!(owner instanceof ServerPlayerEntity thrower)) return;
-
-        Vec3d impactPos = potion.getPos();
-        boolean allowed = isPotionAreaSafe(thrower, impactPos);
-
-        if (!allowed) {
-            sendDenyNotification(thrower);
-            ci.cancel();
-        }
-    }
-
-    @Inject(method = "onBlockHit", at = @At("HEAD"), cancellable = true)
-    private void preventWaterBottleExtinguishingBlocks(BlockHitResult blockHitResult, CallbackInfo ci) {
-        PotionEntity potion = (PotionEntity) (Object) this;
-        if (potion.getWorld().isClient) return;
-        if (!isWaterBottle(potion)) return;
-
-        Entity owner = potion.getOwner();
-        if (!(owner instanceof ServerPlayerEntity thrower)) return;
-
-        BlockPos pos = blockHitResult.getBlockPos();
-        BlockState state = potion.getWorld().getBlockState(pos);
-
-        if (state.getBlock() instanceof CampfireBlock && state.get(CampfireBlock.LIT)) {
-            if (!RegionPermissionChecker.isAllowed(thrower, Rule.EXTINGUISH_FIRE, pos)) {
-                sendExtinguishDenyNotification(thrower);
-                ci.cancel();
-                return;
-            }
-
-            if (potion.getWorld() instanceof ServerWorld serverWorld) {
-                CampfireOriginTracker tracker = WorldRegistry.get(serverWorld)
-                        .getTrackerManager()
-                        .getCampfireOriginTracker();
-                tracker.remove(pos);
-            }
-        }
-    }
-
-    @Inject(method = "applyWater", at = @At("HEAD"), cancellable = true)
-    private void preventWaterBottleExtinguishingEntities(CallbackInfo ci) {
-        PotionEntity potion = (PotionEntity) (Object) this;
-        if (potion.getWorld().isClient) return;
-        if (!isWaterBottle(potion)) return;
-
-        Entity owner = potion.getOwner();
-        if (!(owner instanceof ServerPlayerEntity thrower)) return;
-
-        BlockPos pos = potion.getBlockPos();
-        if (!RegionPermissionChecker.isAllowed(thrower, Rule.EXTINGUISH_FIRE, pos)) {
-            sendExtinguishDenyNotification(thrower);
-            ci.cancel();
-        }
-    }
-
-    @Unique
-    private boolean isWaterBottle(PotionEntity potion) {
-        var stack = potion.getStack();
-        if (!stack.isOf(Items.SPLASH_POTION) && !stack.isOf(Items.LINGERING_POTION)) return false;
-        var contents = stack.getOrDefault(net.minecraft.component.DataComponentTypes.POTION_CONTENTS, PotionContentsComponent.DEFAULT);
-
-        return contents.potion().orElse(null) == Potions.WATER;
-    }
-
-    @Unique
-    private static boolean isPotionAreaSafe(ServerPlayerEntity thrower, Vec3d center) {
-        final int r = POTION_EFFECT_RADIUS_CHECK;
-        for (int dx = -r; dx <= r; dx++) {
-            for (int dz = -r; dz <= r; dz++) {
-                if (Math.abs(dx) + Math.abs(dz) > r + 1) continue;
-                BlockPos checkPos = BlockPos.ofFloored(center.x + dx, center.y, center.z + dz);
-                if (!RegionPermissionChecker.isAllowed(thrower, Rule.THROW_POTIONS, checkPos)) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    @Unique
-    private void sendExtinguishDenyNotification(ServerPlayerEntity serverPlayer) {
-        PlayerNotification.trySend(serverPlayer, NotificationType.DENY_EXTINGUISH_FIRE, Color.RED);
-    }
-
-    @Unique
-    private void sendDenyNotification(ServerPlayerEntity serverPlayer) {
-        PlayerNotification.trySend(serverPlayer, NotificationType.DENY_THROW_POTION, Color.RED);
-    }
+    // Метод applyEffects находится именно в ThrownSplashPotion
+//    @Inject(method = "applyEffects", at = @At("HEAD"), cancellable = true)
+//    private void cancelSplashInProtectedRegion(Entity entity, Collection<MobEffectInstance> effects, CallbackInfo ci) {
+//        ThrownSplashPotion potion = (ThrownSplashPotion) (Object) this;
+//        Entity owner = potion.getOwner();
+//        if (!(owner instanceof ServerPlayer thrower)) return;
+//        if (!(potion.level() instanceof ServerLevel serverLevel)) return;
+//
+//        Vec3 impactPos = potion.position();
+//        boolean allowed = isPotionAreaSafe(thrower, impactPos, serverLevel);
+//        if (!allowed) {
+//            ci.cancel();
+//            PlayerNotification.trySend(thrower, NotificationType.DENY_THROW_POTION, Color.RED);
+//        }
+//    }
+//
+//    // Метод onHitBlock находится в AbstractThrownPotion (родитель),
+//    // но Mixin позволяет инжектиться в него через дочерний класс
+//    @Inject(method = "onHitBlock", at = @At("HEAD"), cancellable = true)
+//    private void preventWaterBottleExtinguishingBlocks(BlockHitResult blockHitResult, CallbackInfo ci) {
+//        AbstractThrownPotion potion = (AbstractThrownPotion) (Object) this;
+//        if (potion.level().isClientSide()) return;
+//        if (!(potion.level() instanceof ServerLevel serverLevel)) return;
+//        if (!isWaterBottle(potion)) return;
+//
+//        Entity owner = potion.getOwner();
+//        if (!(owner instanceof ServerPlayer thrower)) return;
+//
+//        BlockPos pos = blockHitResult.getBlockPos();
+//        BlockState state = potion.level().getBlockState(pos);
+//
+//        if (state.getBlock() instanceof CampfireBlock && state.getValue(CampfireBlock.LIT)) {
+//            if (!RegionPermissionChecker.isAllowed(thrower.getUUID(), Rule.EXTINGUISH_FIRE, pos, serverLevel)) {
+//                PlayerNotification.trySend(thrower, NotificationType.DENY_EXTINGUISH_FIRE, Color.RED);
+//                ci.cancel();
+//                return;
+//            }
+//            CampfireOriginTracker tracker = WorldRegistry.get(serverLevel)
+//                    .getTrackerManager()
+//                    .getCampfireOriginTracker();
+//            tracker.remove(pos);
+//        }
+//    }
+//
+//    @Unique
+//    private boolean isWaterBottle(AbstractThrownPotion potion) {
+//        ItemStack stack = potion.getItem();
+//        if (!stack.is(Items.SPLASH_POTION)) return false;
+//
+//        PotionContentsComponent contents = stack.getOrDefault(DataComponents.POTION_CONTENTS, PotionContentsComponent.EMPTY);
+//        return contents.potion().map(holder -> holder.is(Potions.WATER)).orElse(false);
+//    }
+//
+//    @Unique
+//    private static boolean isPotionAreaSafe(ServerPlayer thrower, Vec3 center, ServerLevel serverLevel) {
+//        final int r = POTION_EFFECT_RADIUS_CHECK;
+//        for (int dx = -r; dx <= r; dx++) {
+//            for (int dz = -r; dz <= r; dz++) {
+//                if (Math.abs(dx) + Math.abs(dz) > r + 1) continue;
+//                BlockPos checkPos = BlockPos.containing(center.x + dx, center.y, center.z + dz);
+//                if (!RegionPermissionChecker.isAllowed(thrower.getUUID(), Rule.THROW_POTIONS, checkPos, serverLevel)) {
+//                    return false;
+//                }
+//            }
+//        }
+//        return true;
+//    }
 }

@@ -1,27 +1,26 @@
 package dev.slarrties.privit.server.region;
 
 import dev.slarrties.privit.common.region.Color;
-import dev.slarrties.privit.common.region.RegionGroups;
 import dev.slarrties.privit.common.region.rule.Rule;
+import dev.slarrties.privit.common.region.RegionGroups;
 
-import net.minecraft.util.math.BlockBox;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
 import java.util.*;
 
 public record Region(
         UUID id,
         String name,
-        BlockBox bounds,
+        BoundingBox bounds,
         BlockPos pivotPos,
         Color color,
         RegionGroups groups
 ) {
-
     public static class Builder {
         private UUID id;
         private String name;
-        private BlockBox bounds;
+        private BoundingBox bounds;
         private BlockPos pivotPos;
         private Color color;
         private RegionGroups groups;
@@ -29,9 +28,9 @@ public record Region(
         public Builder(BlockPos initialPivotPos, String name, UUID owner) {
             this.id = UUID.randomUUID();
             this.pivotPos = initialPivotPos;
-            this.bounds = BlockBox.create(
-                    initialPivotPos.add(-2, -2, -2),
-                    initialPivotPos.add(2, 2, 2)
+            this.bounds = BoundingBox.fromCorners(
+                    initialPivotPos.offset(-2, -2, -2),
+                    initialPivotPos.offset(2, 2, 2)
             );
             this.color = Color.getDefault();
             this.name = name != null && !name.isBlank() ? name : "Region";
@@ -49,7 +48,7 @@ public record Region(
 
         public Builder id(UUID id)                  { this.id = id; return this; }
         public Builder name(String name)            { this.name = name; return this; }
-        public Builder bounds(BlockBox bounds)      { this.bounds = bounds; return this; }
+        public Builder bounds(BoundingBox bounds)   { this.bounds = bounds; return this; }
         public Builder pivotPos(BlockPos pos)       { this.pivotPos = pos; return this; }
         public Builder color(Color color)           { this.color = color; return this; }
         public Builder groups(RegionGroups groups) {
@@ -60,7 +59,6 @@ public record Region(
         public Region build() {
             if (id == null) id = UUID.randomUUID();
             if (groups == null) throw new IllegalStateException("[Region] Groups must be initialized");
-
             return new Region(id, name, bounds, pivotPos, color, groups);
         }
     }

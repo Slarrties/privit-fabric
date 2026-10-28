@@ -4,10 +4,10 @@ import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.server.tracking.protection.TrackerManager;
 
 import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtSizeTracker;
-import net.minecraft.util.WorldSavePath;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.storage.LevelResource;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -17,32 +17,31 @@ import java.nio.file.StandardCopyOption;
 public final class TrackerNbtPersistence {
 
     private static final String FILE_NAME = "privit_trackers.dat";
-    private final ServerWorld world;
+    private final ServerLevel level;
     private final Path filePath;
 
-    public TrackerNbtPersistence(ServerWorld world) {
-        this.world = world;
-        this.filePath = world.getServer()
-                .getSavePath(WorldSavePath.ROOT)
+    public TrackerNbtPersistence(ServerLevel level) {
+        this.level = level;
+        this.filePath = level.getServer()
+                .getWorldPath(LevelResource.ROOT)
                 .resolve(PrivitMod.MOD_ID)
-                .resolve(world.getRegistryKey().getValue().getPath())
+                .resolve(level.dimension().identifier().toString().replace(':', '_'))
                 .resolve(FILE_NAME);
         createDirectories();
     }
 
     public void load(TrackerManager trackerManager) {
         if (!Files.exists(filePath)) {
-            PrivitMod.LOGGER.info("[NbtTrackerStorage] No tracker save file found for dimension {}", world.getRegistryKey().getValue());
+            PrivitMod.LOGGER.info("[NbtTrackerStorage] No tracker save file found for dimension {}", level.dimension());
             return;
         }
 
         try (var input = Files.newInputStream(filePath)) {
-            NbtCompound root = NbtIo.readCompressed(input, NbtSizeTracker.ofUnlimitedBytes());
+            CompoundTag root = NbtIo.readCompressed(input, NbtAccounter.unlimitedHeap());
+            CompoundTag trackersTag = root.getCompoundOrEmpty("trackers");
 
-            if (root.contains("trackers", net.minecraft.nbt.NbtElement.COMPOUND_TYPE)) {
-                trackerManager.loadFromNbt(root.getCompound("trackers"));
-//                PrivitMod.LOGGER.info("[NbtTrackerStorage] Loaded tracker data for dimension {}",
-//                        world.getRegistryKey().getValue());
+            if (!trackersTag.isEmpty()) {
+                trackerManager.loadFromNbt(trackersTag);
             }
         } catch (IOException e) {
             PrivitMod.LOGGER.error("[NbtTrackerStorage::load] Error loading trackers from NBT", e);
@@ -50,8 +49,8 @@ public final class TrackerNbtPersistence {
     }
 
     public void save(TrackerManager trackerManager) {
-        NbtCompound root = new NbtCompound();
-        NbtCompound trackersData = trackerManager.saveToNbt();
+        CompoundTag root = new CompoundTag();
+        CompoundTag trackersData = trackerManager.saveToNbt();
 
         if (!trackersData.isEmpty()) {
             root.put("trackers", trackersData);
@@ -59,13 +58,11 @@ public final class TrackerNbtPersistence {
 
         try {
             Path tempPath = filePath.resolveSibling(FILE_NAME + ".tmp");
-
             try (var output = Files.newOutputStream(tempPath)) {
                 NbtIo.writeCompressed(root, output);
             }
-
             Files.move(tempPath, filePath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            PrivitMod.LOGGER.info("[NbtTrackerStorage] Saved tracker data for dimension {}", world.getRegistryKey().getValue());
+            PrivitMod.LOGGER.info("[NbtTrackerStorage] Saved tracker data for dimension {}", level.dimension());
         } catch (IOException e) {
             PrivitMod.LOGGER.error("[NbtTrackerStorage::save] Error saving trackers to NBT", e);
         }

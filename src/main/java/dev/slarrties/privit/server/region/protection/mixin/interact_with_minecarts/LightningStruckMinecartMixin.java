@@ -8,11 +8,11 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LightningEntity;
-import net.minecraft.entity.vehicle.AbstractMinecartEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LightningBolt;
+import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -25,29 +25,28 @@ import java.util.UUID;
 @Mixin(Entity.class)
 public abstract class LightningStruckMinecartMixin {
 
-    @Inject(method = "onStruckByLightning", at = @At("HEAD"), cancellable = true)
-    private void preventLightningStrikeOnMinecart(ServerWorld world, LightningEntity lightning, CallbackInfo ci) {
+    @Inject(method = "thunderHit", at = @At("HEAD"), cancellable = true)
+    private void preventLightningStrikeOnMinecart(ServerLevel level, LightningBolt lightning, CallbackInfo ci) {
         Entity self = (Entity) (Object) this;
+        if (!(self instanceof AbstractMinecart)) return;
 
-        if (!(self instanceof AbstractMinecartEntity)) return;
-        if (self.getWorld() instanceof ServerWorld serverWorld) {
-            UUID responsible = WorldRegistry.get(serverWorld)
-                    .getTrackerManager()
-                    .getLightningOriginTracker()
-                    .getResponsible(lightning);
-            if (responsible == null) {
-                if (lightning.getChanneler() != null)
-                    responsible = lightning.getChanneler().getUuid();
+        UUID responsible = WorldRegistry.get(level)
+                .getTrackerManager()
+                .getLightningOriginTracker()
+                .getResponsible(lightning);
+
+        if (responsible == null) {
+            if (lightning.getCause() != null) {
+                responsible = lightning.getCause().getUUID();
             }
-            if (responsible == null) return;
+        }
+        if (responsible == null) return;
 
-            boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_MINECARTS, self.getBlockPos(), serverWorld);
-
-            if (!allowed) {
-                ServerPlayerEntity serverPlayer = serverWorld.getServer().getPlayerManager().getPlayer(responsible);
-                PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_MINECART, Color.RED);
-                ci.cancel();
-            }
+        boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_MINECARTS, self.blockPosition(), level);
+        if (!allowed) {
+            ServerPlayer serverPlayer = level.getServer().getPlayerList().getPlayer(responsible);
+            PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_MINECART, Color.RED);
+            ci.cancel();
         }
     }
 }

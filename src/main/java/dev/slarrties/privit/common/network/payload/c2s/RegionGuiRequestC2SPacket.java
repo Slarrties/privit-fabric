@@ -2,19 +2,20 @@ package dev.slarrties.privit.common.network.payload.c2s;
 
 import dev.slarrties.privit.PrivitMod;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
-public record RegionGuiRequestC2SPacket(BlockPos tablePos) implements CustomPayload {
-
-    public static final Id<RegionGuiRequestC2SPacket> ID = new Id<>(PrivitMod.id("region_gui_request"));
-    public static final PacketCodec<PacketByteBuf, RegionGuiRequestC2SPacket> CODEC = PacketCodec.of(
-            (value, buf) -> buf.writeBlockPos(value.tablePos),
+public record RegionGuiRequestC2SPacket(BlockPos tablePos) implements CustomPacketPayload {
+    public static final Type<RegionGuiRequestC2SPacket> TYPE = new Type<>(PrivitMod.id("region_gui_request"));
+    public static final StreamCodec<FriendlyByteBuf, RegionGuiRequestC2SPacket> CODEC = StreamCodec.of(
+            (FriendlyByteBuf buf, RegionGuiRequestC2SPacket packet) -> buf.writeBlockPos(packet.tablePos),
             buf -> new RegionGuiRequestC2SPacket(buf.readBlockPos())
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() { return ID; }
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
+    }
 }

@@ -7,11 +7,11 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.block.Blocks;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.network.ServerPlayerInteractionManager;
-import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerPlayerGameMode;
+import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -21,17 +21,18 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @AssociatedRule(Rule.EXTINGUISH_FIRE)
-@Mixin(ServerPlayerInteractionManager.class)
+@Mixin(ServerPlayerGameMode.class)
 public abstract class FireExtinguishMixin {
 
-    @Final @Shadow protected ServerPlayerEntity player;
+    @Final @Shadow
+    protected ServerPlayer player;
 
-    @Inject(method = "tryBreakBlock", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "destroyBlock", at = @At("HEAD"), cancellable = true)
     private void preventFireExtinguish(BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
-        if (player.getWorld().getBlockState(pos).getBlock() != Blocks.FIRE) return;
-        if (!RegionPermissionChecker.isAllowed(player, Rule.EXTINGUISH_FIRE, pos)) {
+        if (player.level().getBlockState(pos).getBlock() != Blocks.FIRE) return;
+        if (!RegionPermissionChecker.isAllowed(player.getUUID(), Rule.EXTINGUISH_FIRE, pos, player.level())) {
             PlayerNotification.trySend(player, NotificationType.DENY_EXTINGUISH_FIRE, Color.RED);
-            player.networkHandler.sendPacket(new BlockUpdateS2CPacket(pos, player.getWorld().getBlockState(pos)));
+            player.connection.send(new ClientboundBlockUpdatePacket(pos, player.level().getBlockState(pos)));
             cir.setReturnValue(false);
         }
     }

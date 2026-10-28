@@ -3,33 +3,29 @@ package dev.slarrties.privit.client.gui.widget.list;
 import dev.slarrties.privit.client.util.ClientPlayerIdentityCache;
 import dev.slarrties.privit.common.util.PlayerIdentity;
 
-import net.minecraft.text.Text;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
 
 import java.util.*;
 import java.util.function.Consumer;
 
 public class PlayerSearchList extends BaseScrollableListWidget<PlayerIdentity> {
-
-    private final TextRenderer textRenderer;
+    private final Font font;
     private final Consumer<PlayerIdentity> onPlayerSelected;
-
     private String currentQuery = "";
     private final Set<UUID> onlineUuids = new HashSet<>();
-
     private final ClientPlayerIdentityCache identityCache = ClientPlayerIdentityCache.getInstance();
 
     public PlayerSearchList(
             int x, int y, int width, int height,
-            TextRenderer textRenderer,
+            Font font,
             Consumer<PlayerIdentity> onPlayerSelected
     ) {
         super(x, y, width, height, 22, null, null, null);
-        this.textRenderer = textRenderer;
+        this.font = font;
         this.onPlayerSelected = onPlayerSelected;
-
         setScrollbarPosition(ScrollbarPosition.RIGHT);
         setScrollbarWidth(6);
         setScrollbarPadding(0);
@@ -38,7 +34,6 @@ public class PlayerSearchList extends BaseScrollableListWidget<PlayerIdentity> {
 
     public void updateList(List<PlayerIdentity> availablePlayers, String query) {
         this.currentQuery = query.trim().toLowerCase(Locale.ROOT);
-
         List<PlayerIdentity> filtered;
 
         if (currentQuery.isEmpty()) {
@@ -56,7 +51,6 @@ public class PlayerSearchList extends BaseScrollableListWidget<PlayerIdentity> {
                     })
                     .toList();
         }
-
         updateEntries(filtered);
     }
 
@@ -83,52 +77,43 @@ public class PlayerSearchList extends BaseScrollableListWidget<PlayerIdentity> {
     }
 
     @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {
-        // Можно добавить позже
-    }
+    protected void updateWidgetNarration(NarrationElementOutput output) {}
 
-    // =====================================================================
-    //
-    // =====================================================================
+    // -------------------------------------------------------------------------
+    //  Entry
+    // -------------------------------------------------------------------------
 
     private class PlayerEntry extends Entry<PlayerIdentity> {
-
         public PlayerEntry(PlayerIdentity identity) {
             super(identity, () -> onPlayerSelected.accept(identity));
         }
 
         @Override
-        public void render(DrawContext context, int index, int y, int x, int entryWidth, int entryHeight,
-                           int mouseX, int mouseY, boolean hovered, boolean selected, float tickDelta) {
-
+        public void extractWidgetRenderState(GuiGraphicsExtractor graphics, int index, int y, int x, int entryWidth, int entryHeight,
+                                             int mouseX, int mouseY, boolean hovered, boolean selected, float a) {
             PlayerIdentity identity = data;
-
             if (hovered || selected) {
-                context.fill(x, y, x + entryWidth, y + entryHeight,
+                graphics.fill(x, y, x + entryWidth, y + entryHeight,
                         hovered ? 0x44AAAAAA : 0x88FFFFFF);
             }
 
             String displayName = identity.getDisplayName();
-
-            context.drawTextWithShadow(textRenderer,
-                    Text.literal(displayName),
+            graphics.text(font,
+                    Component.literal(displayName),
                     x + 4, y + (entryHeight - 8) / 2,
-                    selected ? 0xFFFFAA : 0xFFFFFF);
+                    selected ? 0xFFFFFFAA : 0xFFFFFFFF,
+                    true);
 
             boolean isOnline = onlineUuids.contains(identity.uuid());
             if (isOnline) {
                 int iconX = x + entryWidth - 24;
                 int iconY = y + (entryHeight - 16) / 2;
-                context.fill(iconX, iconY, iconX + 16, iconY + 16, 0xFF00FF00);
+                graphics.fill(iconX, iconY, iconX + 16, iconY + 16, 0xFF00FF00);
             }
-
-//            if (!identity.isKnown()) {}
         }
 
         @Override
-        public void setFocused(boolean focused) {
-            // не используется
-        }
+        public void setFocused(boolean focused) {}
 
         @Override
         public boolean isFocused() {

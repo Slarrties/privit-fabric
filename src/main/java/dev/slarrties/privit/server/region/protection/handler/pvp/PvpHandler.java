@@ -8,9 +8,9 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.handler.RuleEventHandler;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.server.level.ServerPlayer;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 
 @AssociatedRule(Rule.PVP)
@@ -23,17 +23,17 @@ public final class PvpHandler implements RuleEventHandler {
     public void register() {
 
         AttackEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
-            if (world.isClient || !(player instanceof ServerPlayerEntity serverPlayer)) return ActionResult.PASS;
-            if (!(entity instanceof ServerPlayerEntity victim)) return ActionResult.PASS;
+            if (world.isClientSide() || !(player instanceof ServerPlayer serverPlayer)) return InteractionResult.PASS;
+            if (!(entity instanceof ServerPlayer victim)) return InteractionResult.PASS;
 
-            BlockPos pos = victim.getBlockPos();
+            BlockPos pos = victim.getOnPos();
             boolean attackerAllowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.PVP, pos);
-            boolean victimAllowed   = RegionPermissionChecker.isAllowed(victim,   Rule.PVP, pos);
-            if (attackerAllowed && victimAllowed) return ActionResult.PASS;
+            boolean victimAllowed = RegionPermissionChecker.isAllowed(victim, Rule.PVP, pos);
+            if (attackerAllowed && victimAllowed) return InteractionResult.PASS;
 
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_PVP, Color.RED);
 
-            return ActionResult.FAIL;
+            return InteractionResult.FAIL;
         });
     }
 }

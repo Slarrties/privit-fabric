@@ -4,27 +4,26 @@ import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.client.gui.widget.GuiButton;
 import dev.slarrties.privit.common.util.PlayerIdentity;
 
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.screen.ButtonTextures;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.WidgetSprites;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.MouseButtonEvent;
 
 import java.util.List;
 import java.util.function.Consumer;
 
 public class PlayerListWidget extends BaseScrollableListWidget<PlayerIdentity> {
 
-    private static final Identifier DELETE_ICON = Identifier.of(PrivitMod.MOD_ID, "textures/gui/delete_region_icon.png");
-    private static final ButtonTextures BUTTON_BACKGROUND = new ButtonTextures(
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_paper_common.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_paper_pressed.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_paper_active.png")
+    private static final Identifier DELETE_ICON = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/delete_region_icon.png");
+    private static final WidgetSprites BUTTON_BACKGROUND = new WidgetSprites(
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_paper_common.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_paper_pressed.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_paper_active.png")
     );
-
     private final Consumer<PlayerIdentity> onRemovePlayer;
     private boolean isOwnerGroup;
 
@@ -78,17 +77,16 @@ public class PlayerListWidget extends BaseScrollableListWidget<PlayerIdentity> {
     }
 
     @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {}
+    protected void updateWidgetNarration(NarrationElementOutput output) {}
 
     private class PlayerEntry extends Entry<PlayerIdentity> {
-
-        private final ButtonWidget removeButton;
+        private final GuiButton removeButton;
 
         public PlayerEntry(PlayerIdentity identity) {
             super(identity, null);
 
             this.removeButton = new GuiButton.Builder(
-                    Text.literal("×"),
+                    Component.literal("×"),
                     btn -> {
                         if (onRemovePlayer != null) {
                             onRemovePlayer.accept(identity);
@@ -99,83 +97,78 @@ public class PlayerListWidget extends BaseScrollableListWidget<PlayerIdentity> {
                     .icon(DELETE_ICON, 20, 20, 0, -2)
                     .setBackground(BUTTON_BACKGROUND)
                     .build();
-
             updateRemoveButtonState();
         }
 
         private void updateRemoveButtonState() {
             int realMemberCount = PlayerListWidget.this.entries.size() - 1;
             boolean canRemove = !isOwnerGroup || realMemberCount > 1;
-
             removeButton.active = canRemove;
 
             if (canRemove) {
-                removeButton.setTooltip(Tooltip.of(Text.translatable("privit.gui.groups.groups.remove_player")));
+                removeButton.setTooltip(Tooltip.create(Component.translatable("privit.gui.groups.groups.remove_player")));
             } else {
-                removeButton.setTooltip(Tooltip.of(Text.translatable("privit.gui.groups.groups.cannot_remove_player")));
+                removeButton.setTooltip(Tooltip.create(Component.translatable("privit.gui.groups.groups.cannot_remove_player")));
             }
         }
 
         @Override
-        public void render(DrawContext context, int index, int y, int x, int entryWidth, int entryHeight,
-                           int mouseX, int mouseY, boolean hovered, boolean selected, float tickDelta) {
+        public void extractWidgetRenderState(GuiGraphicsExtractor graphics, int index, int y, int x, int entryWidth, int entryHeight,
+                                             int mouseX, int mouseY, boolean hovered, boolean selected, float a) {
             String displayName = data.getDisplayName();
-            int textColor = hovered ? 0xFFFFFF : 0xF5F5F5;
+            int textColor = hovered ? 0xFFFFFFFF : 0xFFF5F5F5;
 
-            context.drawTextWithShadow(
-                    MinecraftClient.getInstance().textRenderer,
-                    Text.literal(displayName),
+            graphics.text(
+                    Minecraft.getInstance().font,
+                    Component.literal(displayName),
                     x + 4,
                     y + (entryHeight - 8) / 2,
-                    textColor
+                    textColor,
+                    true
             );
+
             removeButton.setX(x + entryWidth - 22);
             removeButton.setY(y + (entryHeight - 18) / 2);
             updateRemoveButtonState();
-            removeButton.render(context, mouseX, mouseY, tickDelta);
-            context.fill(x + 6, y + entryHeight - 1, x + entryWidth - 6, y + entryHeight, 0x10FFFFFF);
+            removeButton.extractRenderState(graphics, mouseX, mouseY, a);
+
+            graphics.fill(x + 6, y + entryHeight - 1, x + entryWidth - 6, y + entryHeight, 0x10FFFFFF);
         }
 
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            return removeButton.mouseClicked(mouseX, mouseY, button);
+        public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+            return removeButton.mouseClicked(event, doubleClick);
         }
 
         @Override
         public void setFocused(boolean focused) {}
-
         @Override
-        public boolean isFocused() {
-            return false;
-        }
+        public boolean isFocused() { return false; }
     }
 
     private class AddPlayerEntry extends Entry<PlayerIdentity> {
-
         public AddPlayerEntry() { super(null, onAddClicked); }
 
         @Override
-        public void render(DrawContext context, int index, int y, int x, int entryWidth, int entryHeight,
-                           int mouseX, int mouseY, boolean hovered, boolean selected, float tickDelta) {
+        public void extractWidgetRenderState(GuiGraphicsExtractor graphics, int index, int y, int x, int entryWidth, int entryHeight,
+                                             int mouseX, int mouseY, boolean hovered, boolean selected, float a) {
+            int textColor = hovered ? 0xFFA8FFC0 : 0xFF8AE0A2;
+            Minecraft minecraft = Minecraft.getInstance();
 
-            int textColor = hovered ? 0xA8FFC0 : 0x8AE0A2;
-
-            context.drawTextWithShadow(
-                    MinecraftClient.getInstance().textRenderer,
-                    Text.translatable("privit.gui.groups.players.add"),
+            graphics.text(
+                    minecraft.font,
+                    Component.translatable("privit.gui.groups.players.add"),
                     x + 6,
                     y + (entryHeight - 8) / 2,
-                    textColor
+                    textColor,
+                    true
             );
-            context.fill(x + 6, y + entryHeight - 1, x + entryWidth - 6, y + entryHeight, 0x10FFFFFF);
+            graphics.fill(x + 6, y + entryHeight - 1, x + entryWidth - 6, y + entryHeight, 0x10FFFFFF);
         }
 
         @Override
         public void setFocused(boolean focused) {}
-
         @Override
-        public boolean isFocused() {
-            return false;
-        }
+        public boolean isFocused() { return false; }
     }
 }

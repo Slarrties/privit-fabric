@@ -3,25 +3,24 @@ package dev.slarrties.privit.client.gui.widget.list;
 import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.client.util.FormattedTooltipText;
 
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.Drawable;
-import net.minecraft.client.gui.Selectable;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.util.Mth;
+import net.minecraft.resources.Identifier;
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 
 import java.util.List;
 import java.util.ArrayList;
 import java.util.function.Consumer;
 
-public abstract class BaseScrollableListWidget<T> extends ClickableWidget implements Drawable, Selectable {
-
+public abstract class BaseScrollableListWidget<T> extends AbstractWidget {
     public enum ScrollbarPosition { RIGHT, LEFT, NONE }
 
-    private static final Identifier SCROLLER_TEXTURE = Identifier.of(PrivitMod.MOD_ID, "textures/gui/book_scrollbar_thumb.png");
-    private static final Identifier SCROLLER_BACKGROUND_TEXTURE = Identifier.of(PrivitMod.MOD_ID, "textures/gui/book_scrollbar_track.png");
+    private static final Identifier SCROLLER_TEXTURE = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/book_scrollbar_thumb.png");
 
     private FormattedTooltipText pendingTooltip = null;
     private int tooltipX, tooltipY;
@@ -29,7 +28,6 @@ public abstract class BaseScrollableListWidget<T> extends ClickableWidget implem
     protected final List<Entry<T>> entries = new ArrayList<>();
     protected Entry<T> selected = null;
     protected Entry<T> hovered = null;
-
     protected ScrollbarPosition scrollbarPosition = ScrollbarPosition.RIGHT;
     protected double scrollAmount = 0;
     protected int scrollbarWidth = 6;
@@ -43,7 +41,7 @@ public abstract class BaseScrollableListWidget<T> extends ClickableWidget implem
 
     public BaseScrollableListWidget(int x, int y, int width, int height, int itemHeight,
                                     Consumer<T> onItemSelected, Consumer<T> onItemToggled, Runnable onAddClicked) {
-        super(x, y, width, height, Text.empty());
+        super(x, y, width, height, Component.empty());
         this.itemHeight = itemHeight;
         this.onItemSelected = onItemSelected;
         this.onItemToggled = onItemToggled;
@@ -59,13 +57,9 @@ public abstract class BaseScrollableListWidget<T> extends ClickableWidget implem
     public void updateEntries(List<T> data) {
         entries.clear();
         addDataEntries(data);
-        if (onAddClicked != null) {
-            entries.add(createAddEntry());
-        }
 
-        if (!entries.isEmpty() && shouldSelectFirstByDefault()) {
-            setSelected(entries.get(0));
-        }
+        if (onAddClicked != null) entries.add(createAddEntry());
+        if (!entries.isEmpty() && shouldSelectFirstByDefault()) setSelected(entries.get(0));
 
         scrollAmount = 0;
     }
@@ -87,13 +81,9 @@ public abstract class BaseScrollableListWidget<T> extends ClickableWidget implem
         this.tooltipY = mouseY;
     }
 
-    // -------------------------------------------------------------------------
-    // Render
-    // -------------------------------------------------------------------------
-
     @Override
-    protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
-        context.enableScissor(getX(), getY(), getX() + width, getY() + height);
+    protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+        graphics.enableScissor(getX(), getY(), getX() + width, getY() + height);
 
         int contentX = getX() + getContentLeftOffset();
         int contentWidth = getContentWidth();
@@ -109,39 +99,45 @@ public abstract class BaseScrollableListWidget<T> extends ClickableWidget implem
                         mouseY >= entryY && mouseY < entryY + itemHeight;
                 boolean isSelected = (selected != null && selected == entry);
 
-                entry.render(context, i, entryY, contentX, contentWidth, itemHeight,
+                entry.extractWidgetRenderState(graphics, i, entryY, contentX, contentWidth, itemHeight,
                         mouseX, mouseY, isHovered, isSelected, delta);
-
                 if (isHovered) hovered = entry;
             }
         }
 
-        context.disableScissor();
-        renderScrollbar(context);
+        graphics.disableScissor();
+        renderScrollbar(graphics);
     }
 
-    private void renderScrollbar(DrawContext context) {
+    private void renderScrollbar(GuiGraphicsExtractor graphics) {
         if (scrollbarPosition == ScrollbarPosition.NONE || getMaxScroll() <= 0) return;
 
         int scrollbarX = getScrollbarX();
         int maxScroll = getMaxScroll();
-        int thumbHeight = MathHelper.clamp((this.height * this.height) / getTotalHeight(), 32, this.height - 8);
+        int thumbHeight = Mth.clamp((this.height * this.height) / getTotalHeight(), 32, this.height - 8);
         int thumbY = (int)(scrollAmount * (this.height - thumbHeight) / maxScroll) + this.getY();
+        thumbY = Mth.clamp(thumbY, this.getY(), this.getY() + this.height - thumbHeight);
 
-        thumbY = MathHelper.clamp(thumbY, this.getY(), this.getY() + this.height - thumbHeight);
-        context.drawTexture(SCROLLER_TEXTURE, scrollbarX, thumbY, 5, 5, scrollbarWidth, thumbHeight);
+        graphics.blit(
+                RenderPipelines.GUI_TEXTURED,
+                SCROLLER_TEXTURE,
+                scrollbarX, thumbY,
+                5, 5,
+                scrollbarWidth, thumbHeight,
+                256, 256
+        );
     }
 
     protected void clearPendingTooltip() {
         pendingTooltip = null;
     }
 
-    public void renderPendingTooltip(DrawContext context) {
+    public void renderPendingTooltip(GuiGraphicsExtractor graphics) {
         if (pendingTooltip == null) return;
 
-        context.drawTooltip(
-                net.minecraft.client.MinecraftClient.getInstance().textRenderer,
-                pendingTooltip.text(),
+        graphics.setComponentTooltipForNextFrame(
+                Minecraft.getInstance().font,
+                (List<Component>) pendingTooltip.text(),
                 tooltipX,
                 tooltipY + 25
         );
@@ -170,14 +166,13 @@ public abstract class BaseScrollableListWidget<T> extends ClickableWidget implem
         return Math.max(0, getTotalHeight() - this.height);
     }
 
-    // -------------------------------------------------------------------------
-    // Events
-    // -------------------------------------------------------------------------
-
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!isMouseOver(mouseX, mouseY)) return false;
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
 
+        if (!isMouseOver(mouseX, mouseY)) return false;
         if (isOverScrollbar(mouseX, mouseY)) {
             updateScrollFromMouse(mouseY);
             return true;
@@ -192,32 +187,34 @@ public abstract class BaseScrollableListWidget<T> extends ClickableWidget implem
             int entryY = drawY + i * itemHeight;
 
             if (entryY + itemHeight >= getY() && entryY <= getY() + height) {
-                if (mouseY >= entryY && mouseY < entryY + itemHeight &&
-                        mouseX >= contentX && mouseX <= contentX + contentWidth) {
-                    if (entry.mouseClicked(mouseX, mouseY, button)) {
+                if (mouseY >= entryY && mouseY < entryY + itemHeight && mouseX >= contentX && mouseX <= contentX + contentWidth) {
+                    if (entry.mouseClicked(event, doubleClick)) {
                         setSelected(entry);
                         return true;
                     }
                 }
             }
         }
-
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+
         if (isOverScrollbar(mouseX, mouseY)) {
             updateScrollFromMouse(mouseY);
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+
+        return super.mouseDragged(event, dx, dy);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
         if (this.isMouseOver(mouseX, mouseY)) {
-            scrollAmount = MathHelper.clamp(scrollAmount - vertical * itemHeight / 2, 0, getMaxScroll());
+            scrollAmount = Mth.clamp(scrollAmount - vertical * itemHeight / 2, 0, getMaxScroll());
             return true;
         }
         return false;
@@ -225,7 +222,6 @@ public abstract class BaseScrollableListWidget<T> extends ClickableWidget implem
 
     private boolean isOverScrollbar(double mouseX, double mouseY) {
         if (scrollbarPosition == ScrollbarPosition.NONE || getMaxScroll() <= 0) return false;
-
         int sx = getScrollbarX();
         return mouseX >= sx && mouseX <= sx + scrollbarWidth &&
                 mouseY >= this.getY() && mouseY <= this.getY() + this.height;
@@ -233,19 +229,14 @@ public abstract class BaseScrollableListWidget<T> extends ClickableWidget implem
 
     private void updateScrollFromMouse(double mouseY) {
         double relative = (mouseY - this.getY()) / (double) this.height;
-        scrollAmount = MathHelper.clamp(relative * getTotalHeight(), 0, getMaxScroll());
-    }
-
-    @Override
-    public SelectionType getType() {
-        return hovered != null ? SelectionType.HOVERED : SelectionType.NONE;
+        scrollAmount = Mth.clamp(relative * getTotalHeight(), 0, getMaxScroll());
     }
 
     // -------------------------------------------------------------------------
     //  Entry
     // -------------------------------------------------------------------------
 
-    public abstract static class Entry<E> implements Element {
+    public abstract static class Entry<E> implements GuiEventListener {
         protected final E data;
         protected Runnable onClick;
 
@@ -254,11 +245,11 @@ public abstract class BaseScrollableListWidget<T> extends ClickableWidget implem
             this.onClick = onClick;
         }
 
-        public abstract void render(DrawContext context, int index, int y, int x, int entryWidth, int entryHeight,
-                                    int mouseX, int mouseY, boolean hovered, boolean selected, float tickDelta);
+        public abstract void extractWidgetRenderState(GuiGraphicsExtractor graphics, int index, int y, int x, int entryWidth, int entryHeight,
+                                                      int mouseX, int mouseY, boolean hovered, boolean selected, float a);
 
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
             if (onClick != null) onClick.run();
             return true;
         }

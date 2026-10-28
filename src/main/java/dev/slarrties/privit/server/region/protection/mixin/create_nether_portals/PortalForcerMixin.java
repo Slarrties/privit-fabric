@@ -8,12 +8,12 @@ import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.tracking.protection.NetherPortalEntryTracker;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.world.BlockLocating;
-import net.minecraft.world.dimension.PortalForcer;
+import net.minecraft.util.BlockUtil;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.portal.PortalForcer;
 
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -28,27 +28,25 @@ import java.util.Optional;
 @Mixin(PortalForcer.class)
 public abstract class PortalForcerMixin {
 
-    @Final @Shadow private ServerWorld world;
+    @Final @Shadow
+    private ServerLevel level;
 
     @Inject(method = "createPortal", at = @At("HEAD"), cancellable = true)
-    private void preventCreatingPortalInProtectedRegion(
-            BlockPos pos,
-            Direction.Axis axis,
-            CallbackInfoReturnable<Optional<BlockLocating.Rectangle>> cir) {
-        if (world == null || world.isClient) return;
+    private void preventCreatingPortalInProtectedRegion(BlockPos pos, Direction.Axis axis, CallbackInfoReturnable<Optional<BlockUtil.FoundRectangle>> cir) {
+        if (level == null || level.isClientSide()) return;
 
-        ServerPlayerEntity serverPlayer = NetherPortalEntryTracker.getRecentPortalUser(world);
+        ServerPlayer serverPlayer = NetherPortalEntryTracker.getRecentPortalUser(level);
         if (serverPlayer == null) return;
 
-        boolean allowed = WorldRegistry.get(world)
+        boolean allowed = WorldRegistry.get(level)
                 .getRegionManager()
                 .getAt(pos)
-                .map(region -> region.isAllowed(serverPlayer.getUuid(), Rule.CREATE_NETHER_PORTALS))
+                .map(region -> region.isAllowed(serverPlayer.getUUID(), Rule.CREATE_NETHER_PORTALS))
                 .orElse(true);
 
         if (!allowed) {
-            cir.setReturnValue(Optional.empty());
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_CREATE_NETHER_PORTAL, Color.RED);
+            cir.setReturnValue(Optional.empty());
         }
     }
 }

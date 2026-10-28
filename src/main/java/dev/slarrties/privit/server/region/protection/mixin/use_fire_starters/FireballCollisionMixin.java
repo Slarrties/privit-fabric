@@ -10,15 +10,14 @@ import dev.slarrties.privit.server.tracking.protection.FireOriginTracker;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.redstone.handler.RedstoneReceiverHandler;
 
-import net.minecraft.world.World;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.projectile.SmallFireballEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.hurtingprojectile.SmallFireball;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -29,39 +28,35 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.UUID;
 
 @AssociatedRule(Rule.USE_FIRE_STARTERS)
-@Mixin(SmallFireballEntity.class)
+@Mixin(SmallFireball.class)
 public abstract class FireballCollisionMixin {
 
-    @Inject(method = "onCollision(Lnet/minecraft/util/hit/HitResult;)V", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "onHit(Lnet/minecraft/world/phys/HitResult;)V", at = @At("HEAD"), cancellable = true)
     private void cancelFireChargeInProtectedRegion(HitResult hitResult, CallbackInfo ci) {
-        SmallFireballEntity fireball = (SmallFireballEntity) (Object) this;
-        if (fireball.getWorld().isClient) return;
+        SmallFireball fireball = (SmallFireball) (Object) this;
+        if (fireball.level().isClientSide()) return;
 
         Entity owner = fireball.getOwner();
         UUID responsible;
-        World world = fireball.getWorld();
-        BlockPos impactPos = BlockPos.ofFloored(hitResult.getPos());
+        BlockPos impactPos = BlockPos.containing(hitResult.getLocation());
 
-        if(world instanceof ServerWorld serverWorld) {
-            if (owner instanceof ServerPlayerEntity serverPlayer) {
-                responsible = serverPlayer.getUuid();
+        if (fireball.level() instanceof ServerLevel serverLevel) {
+            if (owner instanceof ServerPlayer serverPlayer) {
+                responsible = serverPlayer.getUUID();
             } else {
-                responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverWorld, impactPos);
+                responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverLevel, impactPos);
             }
 
             if (responsible == null) return;
 
-            boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.USE_FIRE_STARTERS, impactPos, serverWorld);
-
+            boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.USE_FIRE_STARTERS, impactPos, serverLevel);
             if (!allowed) {
-                ServerPlayerEntity serverPlayer = serverWorld.getServer()
-                        .getPlayerManager()
-                        .getPlayer(responsible);
+                ServerPlayer serverPlayer = serverLevel.getServer().getPlayerList().getPlayer(responsible);
                 PlayerNotification.trySend(serverPlayer, NotificationType.DENY_USE_FIRE_STARTER, Color.RED);
                 fireball.discard();
                 ci.cancel();
             } else {
-                FireOriginTracker fireTracker = WorldRegistry.get(serverWorld)
+                FireOriginTracker fireTracker = WorldRegistry.get(serverLevel)
                         .getTrackerManager()
                         .getFireOriginTracker();
                 fireTracker.record(this.calculateFirePlacementPos(hitResult), responsible);
@@ -71,12 +66,10 @@ public abstract class FireballCollisionMixin {
 
     @Unique
     private BlockPos calculateFirePlacementPos(HitResult hitResult) {
-        if (!(hitResult instanceof BlockHitResult blockHit))
-            return BlockPos.ofFloored(hitResult.getPos());
-
+        if (!(hitResult instanceof BlockHitResult blockHit)) return BlockPos.containing(hitResult.getLocation());
         BlockPos hitBlock = blockHit.getBlockPos();
-        Direction side = blockHit.getSide();
+        Direction side = blockHit.getDirection();
 
-        return hitBlock.offset(side);
+        return hitBlock.relative(side);
     }
 }

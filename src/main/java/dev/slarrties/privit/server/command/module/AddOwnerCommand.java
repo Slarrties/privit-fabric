@@ -18,21 +18,20 @@ import dev.slarrties.privit.server.command.support.argument.PlayerIdentityResolv
 import dev.slarrties.privit.server.command.support.argument.PlayerIdentityArgument;
 import dev.slarrties.privit.server.command.support.permission.CommandPermissions;
 
-import net.minecraft.text.Text;
-import net.minecraft.command.argument.UuidArgumentType;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.network.chat.Component;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.UuidArgument;
 
 import java.util.List;
 import java.util.UUID;
 
 public final class AddOwnerCommand implements CommandModule, OperatorAccess {
-
     @Override
-    public void register(LiteralArgumentBuilder<ServerCommandSource> root) {
-        root.then(CommandManager.literal("addowner")
-                .requires(CommandPermissions::operator)
-                .then(CommandManager.argument("region", UuidArgumentType.uuid())
+    public void register(LiteralArgumentBuilder<CommandSourceStack> root) {
+        root.then(Commands.literal("addowner")
+                .requires(CommandPermissions::canManage)
+                .then(Commands.argument("region", UuidArgument.uuid())
                         .then(PlayerIdentityArgument.player("player")
                                 .executes(this::addOwner))));
     }
@@ -42,16 +41,16 @@ public final class AddOwnerCommand implements CommandModule, OperatorAccess {
         return List.of(new HelpLine("privit.command.help.addowner", HelpLine.Access.OPERATOR));
     }
 
-    private int addOwner(CommandContext<ServerCommandSource> ctx) throws CommandSyntaxException {
-        ServerCommandSource source = ctx.getSource();
-        UUID regionId = UuidArgumentType.getUuid(ctx, "region");
+    private int addOwner(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        CommandSourceStack source = ctx.getSource();
+        UUID regionId = UuidArgument.getUuid(ctx, "region");
         UUID playerUuid = PlayerIdentityArgument.getUuid(ctx, "player");
         String playerName = PlayerIdentityResolver.resolveName(playerUuid);
 
         var found = RegionLookup.findById(source.getServer(), regionId);
         if (found.isEmpty()) {
             return CommandFeedback.error(source,
-                    Text.translatable("privit.command.addowner.region_not_found", regionId.toString()));
+                    Component.translatable("privit.command.addowner.region_not_found", regionId.toString()));
         }
 
         RegionLookup.LocatedRegion located = found.get();
@@ -61,10 +60,9 @@ public final class AddOwnerCommand implements CommandModule, OperatorAccess {
         boolean alreadyOwner = groups.findByName("owner")
                 .map(g -> g.getMembers().contains(playerUuid))
                 .orElse(false);
-
         if (alreadyOwner) {
             return CommandFeedback.success(source,
-                    Text.translatable("privit.command.addowner.already", playerName, region.name()));
+                    Component.translatable("privit.command.addowner.already", playerName, region.name()));
         }
 
         RegionGroups updated = removeFromOtherGroups(groups, playerUuid);
@@ -73,24 +71,22 @@ public final class AddOwnerCommand implements CommandModule, OperatorAccess {
         );
         owner.addMember(playerUuid);
         updated = updated.withUpdatedGroup("owner", owner);
-
         Region newRegion = new Region.Builder(region).groups(updated).build();
-        RegionManager.OpResult result = WorldRegistry.get(located.world())
+
+        RegionManager.OpResult result = WorldRegistry.get(located.level())
                 .getRegionManager()
                 .tryUpdate(region, newRegion, null);
-
         if (!result.isSuccess()) {
             return CommandFeedback.error(source,
-                    Text.translatable("privit.command.addowner.failed", playerName, region.name()));
+                    Component.translatable("privit.command.addowner.failed", playerName, region.name()));
         }
 
         return CommandFeedback.success(source,
-                Text.translatable("privit.command.addowner.success", playerName, region.name()));
+                Component.translatable("privit.command.addowner.success", playerName, region.name()));
     }
 
     private static RegionGroups removeFromOtherGroups(RegionGroups groups, UUID playerUuid) {
         RegionGroups result = groups;
-
         for (RegionPlayerGroup group : groups.getAll()) {
             if (group.isOwnerGroup() || !group.getMembers().contains(playerUuid)) {
                 continue;
@@ -99,7 +95,6 @@ public final class AddOwnerCommand implements CommandModule, OperatorAccess {
             copy.removeMember(playerUuid);
             result = result.withUpdatedGroup(group.getName(), copy);
         }
-
         return result;
     }
 }

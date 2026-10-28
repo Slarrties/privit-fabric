@@ -2,30 +2,8 @@ package dev.slarrties.privit.server.tracking.protection;
 
 import dev.slarrties.privit.server.tracking.origin.TimestampedBlockOriginTracker;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.world.ServerWorld;
-import org.jetbrains.annotations.Nullable;
-
-import java.util.UUID;
+import net.minecraft.server.level.ServerLevel;
 
 public final class HeatSourceOriginTracker extends TimestampedBlockOriginTracker {
-
-    public HeatSourceOriginTracker(ServerWorld world) {
-        super(world);
-    }
-
-    @Override
-    public void record(BlockPos pos, UUID playerUuid) {
-        super.record(pos, playerUuid);
-    }
-
-    @Nullable
-    public TimestampedBlockOriginTracker.ResponsibleTimestamp getResponsibleTimestamp(BlockPos pos) {
-        return super.getResponsibleTimestamp(pos);
-    }
-
-    @Override
-    public void remove(BlockPos pos) {
-        super.remove(pos);
-    }
+    public HeatSourceOriginTracker(ServerLevel level) { super(level); }
 }

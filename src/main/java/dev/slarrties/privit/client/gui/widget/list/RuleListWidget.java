@@ -3,13 +3,14 @@ package dev.slarrties.privit.client.gui.widget.list;
 import dev.slarrties.privit.client.util.FormattedTooltipText;
 import dev.slarrties.privit.common.region.rule.Rule;
 
-import net.minecraft.text.Text;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 
 import java.util.List;
 import java.util.function.Function;
@@ -34,7 +35,6 @@ public class RuleListWidget extends BaseScrollableListWidget<Rule> {
 
     public void refreshEntries(List<Rule> rulesToShow) {
         entries.clear();
-
         for (Rule rule : rulesToShow)
             entries.add(new RuleEntry(rule));
     }
@@ -49,18 +49,12 @@ public class RuleListWidget extends BaseScrollableListWidget<Rule> {
     protected boolean shouldSelectFirstByDefault() { return false; }
 
     @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {}
-
-    @Override
-    protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+    protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         clearPendingTooltip();
-        super.renderWidget(context, mouseX, mouseY, delta);
-
+        super.extractWidgetRenderState(graphics, mouseX, mouseY, delta);
         if (!isMouseOver(mouseX, mouseY)) return;
-
         for (Entry<Rule> entry : entries) {
             if (!(entry instanceof RuleEntry re) || !re.isMouseOver(mouseX, mouseY)) continue;
-
             setPendingTooltip(
                     FormattedTooltipText.of(re.data.getDescription()),
                     mouseX, mouseY
@@ -69,17 +63,14 @@ public class RuleListWidget extends BaseScrollableListWidget<Rule> {
         }
     }
 
-    // ────────────────────────────────────────────────────────────────
-    //
-    // ────────────────────────────────────────────────────────────────
+    @Override
+    protected void updateWidgetNarration(NarrationElementOutput output) {}
 
     private class RuleEntry extends Entry<Rule> {
-
         private int currentX, currentY, currentWidth, currentHeight;
 
         public RuleEntry(Rule rule) {
             super(rule, null);
-
             this.onClick = () -> {
                 if (onRuleToggle != null) {
                     boolean current = isRuleEnabledGetter.apply(data);
@@ -89,58 +80,58 @@ public class RuleListWidget extends BaseScrollableListWidget<Rule> {
         }
 
         @Override
-        public void render(DrawContext context, int index, int y, int x, int entryWidth, int entryHeight,
-                           int mouseX, int mouseY, boolean hovered, boolean selected, float tickDelta) {
-
+        public void extractWidgetRenderState(GuiGraphicsExtractor graphics, int index, int y, int x, int entryWidth, int entryHeight,
+                                             int mouseX, int mouseY, boolean hovered, boolean selected, float a) {
             this.currentX = x;
             this.currentY = y;
             this.currentWidth = entryWidth;
             this.currentHeight = entryHeight;
 
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft minecraft = Minecraft.getInstance();
             boolean isEnabled = isRuleEnabledGetter != null && isRuleEnabledGetter.apply(data);
-            Text ruleName = data.getName();
-            int maxTextWidth = entryWidth - 15;
-            String trimmedStr = client.textRenderer.trimToWidth(ruleName, maxTextWidth).getString();
 
+            Component ruleName = data.getName();
+            int maxTextWidth = entryWidth - 15;
+            String trimmedStr = minecraft.font.plainSubstrByWidth(ruleName.getString(), maxTextWidth);
             if (!trimmedStr.equals(ruleName.getString()) && trimmedStr.length() > 3) {
                 trimmedStr = trimmedStr.substring(0, trimmedStr.length() - 3) + "...";
             }
 
-            int textColor = hovered ? 0xFFFFFF : 0xF5F5F5;
-
-            context.drawTextWithShadow(
-                    client.textRenderer,
-                    Text.literal(trimmedStr),
+            int textColor = hovered ? 0xFFFFFFFF : 0xFFF5F5F5;
+            graphics.text(
+                    minecraft.font,
+                    Component.literal(trimmedStr),
                     x + 6,
                     y + (entryHeight - 8) / 2,
-                    textColor
+                    textColor,
+                    true
             );
 
-            String icon = isEnabled ? "✔" : "✗";
-            int iconColor = isEnabled ? 0x55FF77 : 0xFF5555;
-
-            int iconX = x + entryWidth - 1 - client.textRenderer.getWidth(icon);
+            String icon = isEnabled ? "✔" : "✘";
+            int iconColor = isEnabled ? 0xFF55FF77 : 0xFFFF5555;
+            int iconX = x + entryWidth - 1 - minecraft.font.width(icon);
             int iconY = y + (entryHeight - 8) / 2;
 
-            context.drawTextWithShadow(
-                    client.textRenderer,
-                    Text.literal(icon).styled(s -> s.withColor(iconColor)),
-                    iconX, iconY, iconColor
+            graphics.text(
+                    minecraft.font,
+                    Component.literal(icon).withStyle(s -> s.withColor(iconColor)),
+                    iconX,
+                    iconY,
+                    iconColor,
+                    true
             );
-            context.fill(x + 6, y + entryHeight - 1, x + entryWidth - 6, y + entryHeight, 0x10FFFFFF);
+
+            graphics.fill(x + 6, y + entryHeight - 1, x + entryWidth - 6, y + entryHeight, 0x10FFFFFF);
         }
 
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
             if (onClick != null) {
-                MinecraftClient client = MinecraftClient.getInstance();
-                SoundEvent soundEvent = SoundEvents.ENTITY_VILLAGER_WORK_CARTOGRAPHER;
-
-                client.getSoundManager().play(
-                        PositionedSoundInstance.master(soundEvent, 1.0F, 1.0F)
+                Minecraft minecraft = Minecraft.getInstance();
+                SoundEvent soundEvent = SoundEvents.VILLAGER_WORK_CARTOGRAPHER;
+                minecraft.getSoundManager().play(
+                        SimpleSoundInstance.forUI(soundEvent, 1.0F, 1.0F)
                 );
-
                 onClick.run();
                 return true;
             }

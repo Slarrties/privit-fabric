@@ -2,10 +2,10 @@ package dev.slarrties.privit.client.config;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.text.Text;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Button;
 
 @Environment(EnvType.CLIENT)
 public final class MissingClothConfigScreen extends Screen {
@@ -13,32 +13,38 @@ public final class MissingClothConfigScreen extends Screen {
     private final Screen parent;
 
     public MissingClothConfigScreen(Screen parent) {
-        super(Text.translatable("privit.config.missing_cloth.title"));
+        super(Component.translatable("privit.config.missing_cloth.title"));
         this.parent = parent;
     }
 
     @Override
     protected void init() {
-        addDrawableChild(ButtonWidget.builder(Text.translatable("gui.done"), button -> close())
-                .dimensions(width / 2 - 100, height - 27, 200, 20)
-                .build());
+        Button button = Button.builder(
+                        Component.translatable("gui.done"),
+                        b -> this.onClose())
+                .bounds(this.width / 2 - 100, this.height - 27, 200, 20)
+                .build();
+
+        this.addRenderableWidget(button);
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.render(context, mouseX, mouseY, delta);
-        context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 40, 0xFFFFFF);
-        context.drawCenteredTextWithShadow(
-                textRenderer,
-                Text.translatable("privit.config.missing_cloth.message"),
-                width / 2,
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a) {
+        super.extractRenderState(graphics, mouseX, mouseY, a);
+        graphics.centeredText(this.font, this.title, this.width / 2, 40, 0xFFFFFF);
+        graphics.centeredText(
+                this.font,
+                Component.translatable("privit.config.missing_cloth.message"),
+                this.width / 2,
                 70,
                 0xAAAAAA
         );
     }
 
     @Override
-    public void close() {
-        if (client != null) client.setScreen(parent);
+    public void onClose() {
+        if (this.minecraft != null) {
+            this.minecraft.setScreen(this.parent);
+        }
     }
 }

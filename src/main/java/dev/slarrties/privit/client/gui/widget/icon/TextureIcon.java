@@ -1,10 +1,9 @@
 package dev.slarrties.privit.client.gui.widget.icon;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.util.Mth;
+import net.minecraft.resources.Identifier;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 
 public class TextureIcon implements Icon {
     private final int texWidth;
@@ -15,7 +14,6 @@ public class TextureIcon implements Icon {
     private final int hoverV;
     private final int disabledU;
     private final int disabledV;
-
     private final IconMode mode;
     private final Identifier texture;
 
@@ -37,13 +35,9 @@ public class TextureIcon implements Icon {
     }
 
     @Override
-    public void render(DrawContext context, int x, int y, int availableWidth, int availableHeight, boolean hovered, boolean active) {
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-
+    public void render(GuiGraphicsExtractor graphics, int x, int y, int availableWidth, int availableHeight, boolean hovered, boolean active) {
         int drawU = active ? (hovered ? hoverU : u) : disabledU;
         int drawV = active ? (hovered ? hoverV : v) : disabledV;
-
         int drawX = x;
         int drawY = y;
         int drawWidth = texWidth;
@@ -54,7 +48,6 @@ public class TextureIcon implements Icon {
                 drawX += (availableWidth - texWidth) / 2;
                 drawY += (availableHeight - texHeight) / 2;
                 break;
-
             case FIT_CENTER:
                 float ratio = Math.min((float) availableWidth / texWidth, (float) availableHeight / texHeight);
                 drawWidth = (int) (texWidth * ratio);
@@ -62,12 +55,10 @@ public class TextureIcon implements Icon {
                 drawX += (availableWidth - drawWidth) / 2;
                 drawY += (availableHeight - drawHeight) / 2;
                 break;
-
             case STRETCH_FILL:
                 drawWidth = availableWidth;
                 drawHeight = availableHeight;
                 break;
-
             case STRETCH_FIT:
                 float aspect = (float) texWidth / texHeight;
                 float areaAspect = (float) availableWidth / availableHeight;
@@ -83,13 +74,14 @@ public class TextureIcon implements Icon {
                 break;
         }
 
-        drawWidth = MathHelper.clamp(drawWidth, 1, availableWidth);
-        drawHeight = MathHelper.clamp(drawHeight, 1, availableHeight);
+        drawWidth = Mth.clamp(drawWidth, 1, availableWidth);
+        drawHeight = Mth.clamp(drawHeight, 1, availableHeight);
 
-        context.drawTexture(
+        graphics.blit(
+                RenderPipelines.GUI_TEXTURED,
                 texture,
                 drawX, drawY,
-                drawU, drawV,
+                (float) drawU, (float) drawV,
                 drawWidth, drawHeight,
                 texWidth, texHeight
         );

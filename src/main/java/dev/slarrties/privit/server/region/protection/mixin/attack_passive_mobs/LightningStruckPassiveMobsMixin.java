@@ -8,11 +8,15 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LightningEntity;
-import net.minecraft.entity.passive.*;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LightningBolt;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.animal.allay.Allay;
+import net.minecraft.world.entity.animal.axolotl.Axolotl;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.npc.wanderingtrader.WanderingTrader;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -26,31 +30,29 @@ import java.util.UUID;
 @Mixin(Entity.class)
 public abstract class LightningStruckPassiveMobsMixin {
 
-    @Inject(method = "onStruckByLightning", at = @At("HEAD"), cancellable = true)
-    private void preventLightningStrikeOnPassiveMobs(ServerWorld world, LightningEntity lightning, CallbackInfo ci) {
+    @Inject(method = "thunderHit", at = @At("HEAD"), cancellable = true)
+    private void preventLightningStrikeOnPassiveMobs(ServerLevel level, LightningBolt lightning, CallbackInfo ci) {
         Entity entity = (Entity) (Object) this;
 
-        if (entity.getWorld().isClient || !(entity.getWorld() instanceof ServerWorld serverWorld)) return;
+        if (entity.level().isClientSide() || !(entity.level() instanceof ServerLevel serverLevel)) return;
         if (!isProtectedPassiveEntity(entity)) return;
 
-        UUID responsible = WorldRegistry.get(world)
+        UUID responsible = WorldRegistry.get(serverLevel)
                 .getTrackerManager()
                 .getLightningOriginTracker()
                 .getResponsible(lightning);
 
         if (responsible == null) {
-            ServerPlayerEntity channeler = lightning.getChanneler();
-            if (channeler != null) {
-                responsible = channeler.getUuid();
-            }
+            ServerPlayer cause = lightning.getCause();
+            if (cause != null) responsible = cause.getUUID();
         }
 
         if (responsible == null) return;
 
-        boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.ATTACK_PASSIVE_MOBS, entity.getBlockPos(), serverWorld);
+        boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.ATTACK_PASSIVE_MOBS, entity.blockPosition(), serverLevel);
         if (!allowed) {
-            ServerPlayerEntity serverPlayer = serverWorld.getServer()
-                    .getPlayerManager()
+            ServerPlayer serverPlayer = serverLevel.getServer()
+                    .getPlayerList()
                     .getPlayer(responsible);
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_ATTACK_PASSIVE_MOB, Color.RED);
             ci.cancel();
@@ -59,10 +61,10 @@ public abstract class LightningStruckPassiveMobsMixin {
 
     @Unique
     private static boolean isProtectedPassiveEntity(Entity entity) {
-        return entity instanceof AnimalEntity ||
-                entity instanceof VillagerEntity ||
-                entity instanceof AllayEntity ||
-                entity instanceof AxolotlEntity ||
-                entity instanceof WanderingTraderEntity;
+        return entity instanceof Animal ||
+                entity instanceof Villager ||
+                entity instanceof Allay ||
+                entity instanceof Axolotl ||
+                entity instanceof WanderingTrader;
     }
 }

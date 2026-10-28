@@ -4,7 +4,7 @@ import dev.slarrties.privit.common.region.Color;
 import dev.slarrties.privit.common.notification.NotificationType;
 import dev.slarrties.privit.common.network.payload.s2c.HudNotificationS2CPacket;
 
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 import java.util.Map;
@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class PlayerNotification {
 
     private static final long DEFAULT_COOLDOWN_MS = 1800L;
-    private static final Map<ServerPlayerEntity, Map<NotificationType, Long>> lastSent = new WeakHashMap<>();
+    private static final Map<ServerPlayer, Map<NotificationType, Long>> lastSent = new WeakHashMap<>();
     private static final Map<NotificationType, Long> TYPE_COOLDOWNS = Map.of(
             NotificationType.DENY_ITEM_DROP, 1200L,
             NotificationType.DENY_ITEM_PICKUP, 1200L
@@ -22,11 +22,11 @@ public final class PlayerNotification {
 
     private PlayerNotification() {}
 
-    public static boolean trySend(ServerPlayerEntity player, NotificationType type) {
+    public static boolean trySend(ServerPlayer player, NotificationType type) {
         return trySend(player, type, Color.RED);
     }
 
-    public static boolean trySend(ServerPlayerEntity player, NotificationType type, Color color) {
+    public static boolean trySend(ServerPlayer player, NotificationType type, Color color) {
         if (player == null) return false;
 
         long now = System.currentTimeMillis();
@@ -44,7 +44,7 @@ public final class PlayerNotification {
         return true;
     }
 
-    public static void clearForPlayer(ServerPlayerEntity player) {
+    public static void clearForPlayer(ServerPlayer player) {
         if (player != null) {
             lastSent.remove(player);
         }

@@ -1,7 +1,7 @@
 {
   "required": true,
   "package": "dev.slarrties.privit.server.region.protection.mixin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
   "mixins": [
     "attack_passive_mobs.AttackPassiveMobMixin",
     "attack_passive_mobs.LightningStruckPassiveMobsMixin",
@@ -83,19 +83,22 @@
     "redstone.DispenserProtectionMixin",
     "redstone.RedstoneBlockItemPlacementMixin",
     "redstone.RedstoneBreakMixin",
+    "redstone.RedstoneButtonPressMixin",
+    "redstone.RedstoneComposterMixin",
+    "redstone.RedstoneDecoratedPotMixin",
+    "redstone.RedstoneJukeboxPlacedMixin",
+    "redstone.RedstoneLecternMixin",
     "redstone.RedstoneNeighborUpdateMixin",
     "redstone.RedstoneOnEntityCollisionMixin",
     "redstone.RedstoneOnProjectileHitMixin",
-    "redstone.RedstoneOnUseBothMixin",
-    "redstone.RedstoneOnUseOnlyMixin",
-    "redstone.RedstoneOnUseWithItemMixin",
     "redstone.RedstonePlacedMixin",
+    "redstone.RedstoneUseItemOnMixin",
+    "redstone.RedstoneUseWithoutItemMixin",
     "spread_sculk.LichenGrowerMixin",
     "spread_sculk.SculkBlockMixin",
     "spread_sculk.SculkCatalystBloomMixin",
     "spread_sculk.SculkCursorMixin",
     "spread_sculk.SculkSpreadManagerMixin",
-    "spread_sculk.SculkVeinBlockMixin",
     "throw_eggs.EggCollisionMixin",
     "throw_ender_pearls.ThrowEnderPearlMixin",
     "throw_potions.SplashPotionMixin",
@@ -136,11 +139,10 @@
     "use_sponges.SpongeAbsorbMixin",
     "use_trial_mechanics.TrialSpawnerLogicProtectionMixin"
   ],
-  "server": [],
   "injectors": {
     "defaultRequire": 1
   },
   "overwrites": {
     "requireAnnotations": true
-  }
+	}
 }

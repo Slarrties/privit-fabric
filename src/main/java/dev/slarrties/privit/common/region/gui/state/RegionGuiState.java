@@ -1,13 +1,12 @@
 package dev.slarrties.privit.common.region.gui.state;
 
-import dev.slarrties.privit.common.config.ConfigManager;
 import dev.slarrties.privit.common.region.Color;
 import dev.slarrties.privit.common.region.RegionGroups;
-import dev.slarrties.privit.common.region.RegionPlayerGroup;
+import dev.slarrties.privit.common.config.ConfigManager;
 
-import net.minecraft.util.math.BlockBox;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
 import java.util.*;
 
@@ -15,9 +14,9 @@ public final class RegionGuiState {
 
     private final UUID id;
     private String name;
-    private BlockBox realBounds;
-    private BlockBox draftBounds;
-    private List<BlockBox> conflictBounds = Collections.emptyList();
+    private BoundingBox realBounds;
+    private BoundingBox draftBounds;
+    private List<BoundingBox> conflictBounds = Collections.emptyList();
     private BlockPos pivotPos;
     private Color color;
     private RegionGroups groups;
@@ -31,15 +30,14 @@ public final class RegionGuiState {
 
     public static RegionGuiState createNew(UUID id, UUID ownerUuid, BlockPos pivotPos, String ownerName) {
         RegionGuiState state = new RegionGuiState(id);
-
         state.name = (ownerName != null && !ownerName.isBlank())
                 ? ownerName + "'s region"
                 : "New region";
         state.pivotPos = pivotPos;
         state.realBounds = null;
-        state.draftBounds = BlockBox.create(
-                pivotPos.add(-2, -2, -2),
-                pivotPos.add(2, 2, 2)
+        state.draftBounds = new BoundingBox(
+                pivotPos.getX() - 2, pivotPos.getY() - 2, pivotPos.getZ() - 2,
+                pivotPos.getX() + 2, pivotPos.getY() + 2, pivotPos.getZ() + 2
         );
         state.conflictBounds = Collections.emptyList();
         state.color = Color.getDefault();
@@ -47,7 +45,6 @@ public final class RegionGuiState {
         state.isChanged = false;
         state.isAreaLimitExceeded = false;
         state.groups = RegionGroups.create(ownerUuid);
-
         return state;
     }
 
@@ -55,7 +52,7 @@ public final class RegionGuiState {
         return new RegionGuiState(id);
     }
 
-    public void restoreCommitted(String name, BlockBox bounds, Color color, RegionGroups groups) {
+    public void restoreCommitted(String name, BoundingBox bounds, Color color, RegionGroups groups) {
         this.name = name;
         this.realBounds = this.draftBounds = bounds;
         this.conflictBounds = Collections.emptyList();
@@ -68,15 +65,16 @@ public final class RegionGuiState {
 
     public UUID getId() { return id; }
     public String getName() { return name; }
-    public BlockBox getRealBounds() { return realBounds; }
-    public BlockBox getDraftBounds() { return draftBounds; }
-    public List<BlockBox> getConflictBounds() { return Collections.unmodifiableList(conflictBounds); }
+    public BoundingBox getRealBounds() { return realBounds; }
+    public BoundingBox getDraftBounds() { return draftBounds; }
+    public List<BoundingBox> getConflictBounds() { return Collections.unmodifiableList(conflictBounds); }
     public BlockPos getPivotPos() { return pivotPos; }
     public Color getColor() { return color; }
     public RegionGroups getGroups() { return groups; }
     public boolean isCreated() { return isCreated; }
     public boolean isChanged() { return isChanged; }
     public boolean isAreaLimitExceeded() { return isAreaLimitExceeded; }
+    public boolean hasRealBounds() { return realBounds != null; }
 
     public boolean setName(String newName) {
         if (newName == null || newName.isBlank() || newName.length() > 32) {
@@ -90,7 +88,7 @@ public final class RegionGuiState {
         this.color = (newColor != null) ? newColor : Color.getDefault();
     }
 
-    public void setDraftBounds(BlockBox newBounds) {
+    public void setDraftBounds(BoundingBox newBounds) {
         if (newBounds == null) return;
         this.draftBounds = newBounds;
 
@@ -98,14 +96,14 @@ public final class RegionGuiState {
         this.isAreaLimitExceeded = maxArea > 0 && calculateVolume(this.draftBounds) > maxArea;
     }
 
-    private long calculateVolume(BlockBox bounds) {
-        long sizeX = bounds.getMaxX() - bounds.getMinX() + 1L;
-        long sizeY = bounds.getMaxY() - bounds.getMinY() + 1L;
-        long sizeZ = bounds.getMaxZ() - bounds.getMinZ() + 1L;
+    private long calculateVolume(BoundingBox bounds) {
+        long sizeX = bounds.maxX() - bounds.minX() + 1L;
+        long sizeY = bounds.maxY() - bounds.minY() + 1L;
+        long sizeZ = bounds.maxZ() - bounds.minZ() + 1L;
         return sizeX * sizeY * sizeZ;
     }
 
-    public void setConflictBounds(List<BlockBox> conflictBounds) {
+    public void setConflictBounds(List<BoundingBox> conflictBounds) {
         this.conflictBounds = conflictBounds != null
                 ? List.copyOf(conflictBounds)
                 : Collections.emptyList();
@@ -129,84 +127,74 @@ public final class RegionGuiState {
         this.isChanged = changed;
     }
 
-    public boolean hasRealBounds() {
-        return realBounds != null;
-    }
-
-    public void writeToBuf(PacketByteBuf buf) {
-        buf.writeUuid(id);
-        buf.writeString(name, 64);
+    public void writeToBuf(FriendlyByteBuf buf) {
+        buf.writeUUID(id);
+        buf.writeUtf(name, 64);
         buf.writeBlockPos(pivotPos);
-
         buf.writeBoolean(hasRealBounds());
         if (hasRealBounds()) {
-            buf.writeInt(realBounds.getMinX());
-            buf.writeInt(realBounds.getMinY());
-            buf.writeInt(realBounds.getMinZ());
-            buf.writeInt(realBounds.getMaxX());
-            buf.writeInt(realBounds.getMaxY());
-            buf.writeInt(realBounds.getMaxZ());
+            buf.writeInt(realBounds.minX());
+            buf.writeInt(realBounds.minY());
+            buf.writeInt(realBounds.minZ());
+            buf.writeInt(realBounds.maxX());
+            buf.writeInt(realBounds.maxY());
+            buf.writeInt(realBounds.maxZ());
         }
-
-        buf.writeInt(draftBounds.getMinX());
-        buf.writeInt(draftBounds.getMinY());
-        buf.writeInt(draftBounds.getMinZ());
-        buf.writeInt(draftBounds.getMaxX());
-        buf.writeInt(draftBounds.getMaxY());
-        buf.writeInt(draftBounds.getMaxZ());
+        buf.writeInt(draftBounds.minX());
+        buf.writeInt(draftBounds.minY());
+        buf.writeInt(draftBounds.minZ());
+        buf.writeInt(draftBounds.maxX());
+        buf.writeInt(draftBounds.maxY());
+        buf.writeInt(draftBounds.maxZ());
 
         buf.writeVarInt(conflictBounds.size());
-        for (BlockBox box : conflictBounds) {
-            buf.writeInt(box.getMinX());
-            buf.writeInt(box.getMinY());
-            buf.writeInt(box.getMinZ());
-            buf.writeInt(box.getMaxX());
-            buf.writeInt(box.getMaxY());
-            buf.writeInt(box.getMaxZ());
+        for (BoundingBox box : conflictBounds) {
+            buf.writeInt(box.minX());
+            buf.writeInt(box.minY());
+            buf.writeInt(box.minZ());
+            buf.writeInt(box.maxX());
+            buf.writeInt(box.maxY());
+            buf.writeInt(box.maxZ());
         }
 
-        buf.writeString(color.getCode(), 16);
+        buf.writeUtf(color.getCode(), 16);
         groups.writeToBuf(buf);
+
         buf.writeBoolean(isCreated);
         buf.writeBoolean(isChanged);
         buf.writeBoolean(isAreaLimitExceeded);
     }
 
-    public static RegionGuiState readFromBuf(PacketByteBuf buf) {
-        UUID id = buf.readUuid();
-        String name = buf.readString(64);
+    public static RegionGuiState readFromBuf(FriendlyByteBuf buf) {
+        UUID id = buf.readUUID();
+        String name = buf.readUtf(64);
         BlockPos pivotPos = buf.readBlockPos();
 
         boolean hasRealBounds = buf.readBoolean();
-        BlockBox realBounds = null;
+        BoundingBox realBounds = null;
         if (hasRealBounds) {
-            realBounds = BlockBox.create(
-                    new BlockPos(buf.readInt(), buf.readInt(), buf.readInt()),
-                    new BlockPos(buf.readInt(), buf.readInt(), buf.readInt())
+            realBounds = new BoundingBox(
+                    buf.readInt(), buf.readInt(), buf.readInt(),
+                    buf.readInt(), buf.readInt(), buf.readInt()
             );
         }
 
-        BlockBox draftBounds = BlockBox.create(
-                new BlockPos(buf.readInt(), buf.readInt(), buf.readInt()),
-                new BlockPos(buf.readInt(), buf.readInt(), buf.readInt())
+        BoundingBox draftBounds = new BoundingBox(
+                buf.readInt(), buf.readInt(), buf.readInt(),
+                buf.readInt(), buf.readInt(), buf.readInt()
         );
 
         int conflictCount = buf.readVarInt();
-        List<BlockBox> conflictBounds = new ArrayList<>(conflictCount);
+        List<BoundingBox> conflictBounds = new ArrayList<>(conflictCount);
         for (int i = 0; i < conflictCount; i++) {
-            conflictBounds.add(BlockBox.create(
-                    new BlockPos(buf.readInt(), buf.readInt(), buf.readInt()),
-                    new BlockPos(buf.readInt(), buf.readInt(), buf.readInt())
+            conflictBounds.add(new BoundingBox(
+                    buf.readInt(), buf.readInt(), buf.readInt(),
+                    buf.readInt(), buf.readInt(), buf.readInt()
             ));
         }
 
-        Color color = Color.fromCode(buf.readString(16));
-
-        int groupCount = buf.readVarInt();
-        List<RegionPlayerGroup> groups = new ArrayList<>(groupCount);
-        for (int i = 0; i < groupCount; i++) {
-            groups.add(RegionPlayerGroup.readFromBuf(buf));
-        }
+        Color color = Color.fromCode(buf.readUtf(16));
+        RegionGroups groups = RegionGroups.readFromBuf(buf);
 
         boolean isCreated = buf.readBoolean();
         boolean isChanged = buf.readBoolean();
@@ -219,10 +207,11 @@ public final class RegionGuiState {
         state.conflictBounds = conflictBounds;
         state.pivotPos = pivotPos;
         state.color = color;
-        state.groups = RegionGroups.from(groups);
+        state.groups = groups;
         state.isCreated = isCreated;
         state.isChanged = isChanged;
         state.isAreaLimitExceeded = isAreaLimitExceeded;
+
         return state;
     }
 

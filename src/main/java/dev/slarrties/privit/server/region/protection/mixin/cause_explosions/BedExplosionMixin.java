@@ -5,25 +5,23 @@ import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.tracking.protection.FireOriginTracker;
 
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.BedBlock;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.world.World;
-import net.minecraft.world.explosion.Explosion;
-import net.minecraft.world.explosion.ExplosionBehavior;
-
-import com.llamalad7.mixinextras.sugar.Local;
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.ExplosionDamageCalculator;
+import net.minecraft.world.damagesource.DamageSource;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import com.llamalad7.mixinextras.sugar.Local;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 
 import java.util.UUID;
 
@@ -32,47 +30,45 @@ import java.util.UUID;
 public abstract class BedExplosionMixin {
 
     @WrapOperation(
-            method = "onUse",
+            method = "useWithoutItem",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/world/World;createExplosion(Lnet/minecraft/entity/Entity;Lnet/minecraft/entity/damage/DamageSource;Lnet/minecraft/world/explosion/ExplosionBehavior;Lnet/minecraft/util/math/Vec3d;FZLnet/minecraft/world/World$ExplosionSourceType;)Lnet/minecraft/world/explosion/Explosion;"
+                    target = "Lnet/minecraft/world/level/Level;explode(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/damagesource/DamageSource;Lnet/minecraft/world/level/ExplosionDamageCalculator;Lnet/minecraft/world/phys/Vec3;FZLnet/minecraft/world/level/Level$ExplosionInteraction;)V"
             )
     )
-    private Explosion wrapBedExplosion(
-            World world,
+    private void wrapBedExplosion(
+            Level level,
             Entity originalExploder,
             DamageSource damageSource,
-            ExplosionBehavior behavior,
-            Vec3d explosionPos,
+            ExplosionDamageCalculator calculator,
+            Vec3 explosionPos,
             float power,
             boolean createFire,
-            World.ExplosionSourceType explosionSourceType,
-            Operation<Explosion> original,
-            @Local(argsOnly = true) PlayerEntity player
+            Level.ExplosionInteraction interaction,
+            Operation<Void> original,
+            @Local(argsOnly = true) Player player
     ) {
         Entity exploder = originalExploder;
         UUID responsibleId = null;
 
-        if (player instanceof ServerPlayerEntity serverPlayer) {
+        if (player instanceof ServerPlayer serverPlayer) {
             exploder = serverPlayer;
-            responsibleId = serverPlayer.getUuid();
+            responsibleId = serverPlayer.getUUID();
         }
 
-        Explosion explosion = original.call(world, exploder, damageSource, behavior, explosionPos, power, createFire, explosionSourceType);
+        original.call(level, exploder, damageSource, calculator, explosionPos, power, createFire, interaction);
 
-        if (responsibleId != null && createFire && world instanceof ServerWorld serverWorld) {
-            FireOriginTracker fireTracker = WorldRegistry.get(serverWorld)
+        if (responsibleId != null && createFire && level instanceof ServerLevel serverLevel) {
+            FireOriginTracker fireTracker = WorldRegistry.get(serverLevel)
                     .getTrackerManager()
                     .getFireOriginTracker();
-            BlockPos center = BlockPos.ofFloored(explosionPos);
+            BlockPos center = BlockPos.containing(explosionPos);
 
-            for (BlockPos firePos : BlockPos.iterateOutwards(center, 9, 9, 9)) {
-                if (world.getBlockState(firePos).isOf(Blocks.FIRE)) {
+            for (BlockPos firePos : BlockPos.betweenClosed(center.offset(-4, -4, -4), center.offset(4, 4, 4))) {
+                if (level.getBlockState(firePos).is(Blocks.FIRE)) {
                     fireTracker.record(firePos, responsibleId);
                 }
             }
         }
-
-        return explosion;
     }
 }

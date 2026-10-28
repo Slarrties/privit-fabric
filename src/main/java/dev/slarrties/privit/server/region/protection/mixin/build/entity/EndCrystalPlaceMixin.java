@@ -7,12 +7,12 @@ import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.item.EndCrystalItem;
-import net.minecraft.item.ItemUsageContext;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.EndCrystalItem;
+import net.minecraft.world.item.context.UseOnContext;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -22,18 +22,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @AssociatedRule(Rule.BUILD)
 @Mixin(EndCrystalItem.class)
 public abstract class EndCrystalPlaceMixin {
+    @Inject(method = "useOn", at = @At("HEAD"), cancellable = true)
+    private void preventPlace(UseOnContext context, CallbackInfoReturnable<InteractionResult> cir) {
+        if (context.getLevel().isClientSide()) return;
+        if (!(context.getPlayer() instanceof ServerPlayer serverPlayer)) return;
 
-    @Inject(method = "useOnBlock", at = @At("HEAD"), cancellable = true)
-    private void preventPlace(ItemUsageContext context, CallbackInfoReturnable<ActionResult> cir) {
-        if (context.getWorld().isClient()) return;
-        if (!(context.getPlayer() instanceof ServerPlayerEntity serverPlayer)) return;
+        Direction side = context.getClickedFace();
+        BlockPos placePos = context.getClickedPos().offset(side.getUnitVec3i());
 
-        Direction side = context.getSide();
-        BlockPos placePos = context.getBlockPos().offset(side);
-
-        if (!RegionPermissionChecker.isAllowed(serverPlayer.getUuid(), Rule.BUILD, placePos, serverPlayer.getServerWorld())) {
-            cir.setReturnValue(ActionResult.FAIL);
+        if (!RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.BUILD, placePos, serverPlayer.level())) {
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_PLACE_BLOCK, Color.RED);
+            cir.setReturnValue(InteractionResult.FAIL);
         }
     }
 }

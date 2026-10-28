@@ -1,15 +1,13 @@
 package dev.slarrties.privit.server.region.protection;
 
-import dev.slarrties.privit.PrivitMod;
 import dev.slarrties.privit.common.region.rule.Rule;
 import dev.slarrties.privit.common.region.rule.FrozenRules;
 import dev.slarrties.privit.server.region.Region;
 import dev.slarrties.privit.server.world.WorldRegistry;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
-
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.UUID;
@@ -22,7 +20,7 @@ public final class RegionPermissionChecker {
             @NotNull UUID playerId,
             @NotNull Rule rule,
             @NotNull BlockPos pos,
-            @NotNull ServerWorld world
+            @NotNull ServerLevel world
     ) {
         if (FrozenRules.isFrozen(rule)) return true;
 
@@ -37,10 +35,10 @@ public final class RegionPermissionChecker {
     }
 
     public static boolean isAllowed(
-            @NotNull ServerPlayerEntity player,
+            @NotNull ServerPlayer player,
             @NotNull Rule rule,
             @NotNull BlockPos pos
     ) {
-        return isAllowed(player.getUuid(), rule, pos, player.getServerWorld());
+        return isAllowed(player.getUUID(), rule, pos, player.level());
     }
 }

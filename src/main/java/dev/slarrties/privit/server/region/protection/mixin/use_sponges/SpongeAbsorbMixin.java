@@ -10,128 +10,98 @@ import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.protection.FluidOriginTracker;
 import dev.slarrties.privit.server.tracking.context.SpongePlacementContext;
 
-import net.minecraft.block.*;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.world.World;
-import net.minecraft.fluid.FluidState;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.registry.tag.FluidTags;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.BlockPos.TraversalNodeStatus;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.SpongeBlock;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 
-/** TODO: a completely rewritten method is bad
- /** but I don't know how to solve the problem otherwise yet
- */
+import java.util.function.Function;
+import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 @AssociatedRule({Rule.USE_SPONGES, Rule.USE_FLUIDS})
 @Mixin(SpongeBlock.class)
 public abstract class SpongeAbsorbMixin {
 
-    @Unique
-    private static final Direction[] DIRECTIONS = Direction.values();
-    @Unique
-    private static final int ABSORB_RADIUS = 6;
-    @Unique
-    private static final int ABSORB_LIMIT = 65;
+    @Unique private static final ThreadLocal<ServerPlayer> CURRENT_PLAYER = new ThreadLocal<>();
+    @Unique private static final ThreadLocal<Boolean> HAS_NOTIFIED = ThreadLocal.withInitial(() -> false);
 
-    @Inject(method = "absorbWater", at = @At("HEAD"), cancellable = true)
-    private void onSpongeAbsorb(World world, BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
-        if (world.isClient) {
-            cir.setReturnValue(false);
-            cir.cancel();
-            return;
-        }
-
+    @Inject(method = "tryAbsorbWater", at = @At("HEAD"))
+    private void onTryAbsorbHead(Level level, BlockPos pos, CallbackInfo ci) {
         SpongePlacementContext context = SpongePlacementContext.getCurrent();
-        if (context == null || !context.getPos().equals(pos)) {
-            cir.setReturnValue(false);
-            cir.cancel();
-            return;
+        if (context != null && context.getPlayer() != null && context.getPos().equals(pos)) {
+            CURRENT_PLAYER.set(context.getPlayer());
         }
+        HAS_NOTIFIED.set(false);
+    }
 
-        ServerPlayerEntity player = context.getPlayer();
-        SpongePlacementContext.pop();
+    @Inject(method = "tryAbsorbWater", at = @At("RETURN"))
+    private void onTryAbsorbReturn(Level level, BlockPos pos, CallbackInfo ci) {
+        if (HAS_NOTIFIED.get() && CURRENT_PLAYER.get() != null) {
+            PlayerNotification.trySend(CURRENT_PLAYER.get(), NotificationType.DENY_USE_SPONGE, Color.RED);
+        }
+        CURRENT_PLAYER.remove();
+        HAS_NOTIFIED.remove();
+    }
 
-        boolean absorbed = performSelectiveAbsorb(world, pos, player);
-        cir.setReturnValue(absorbed);
-        cir.cancel();
+    @WrapOperation(
+            method = "removeWaterBreadthFirstSearch",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/core/BlockPos;breadthFirstTraversal(Lnet/minecraft/core/BlockPos;IILjava/util/function/BiConsumer;Ljava/util/function/Function;)I"
+            )
+    )
+    private int wrapBreadthFirstTraversal(
+            BlockPos startPos, int maxDepth, int maxCount,
+            BiConsumer<BlockPos, Consumer<BlockPos>> neighborConsumer,
+            Function<BlockPos, TraversalNodeStatus> originalStatusFunction,
+            Operation<Integer> original
+    ) {
+        Function<BlockPos, TraversalNodeStatus> wrappedStatusFunction = (pos) -> {
+            if (isProtected(pos)) {
+                HAS_NOTIFIED.set(true);
+                return TraversalNodeStatus.SKIP;
+            }
+
+            TraversalNodeStatus status = originalStatusFunction.apply(pos);
+
+            if (status == TraversalNodeStatus.ACCEPT) {
+                removeFluidTracker(pos);
+            }
+
+            return status;
+        };
+
+        return original.call(startPos, maxDepth, maxCount, neighborConsumer, wrappedStatusFunction);
     }
 
     @Unique
-    private boolean performSelectiveAbsorb(World world, BlockPos spongePos, ServerPlayerEntity serverPlayer) {
-        AtomicBoolean absorbedAnything = new AtomicBoolean(false);
-        AtomicBoolean triedProtected = new AtomicBoolean(false);
+    private static boolean isProtected(BlockPos pos) {
+        ServerPlayer player = CURRENT_PLAYER.get();
+        if (player == null) return false;
+        if (!(player.level() instanceof ServerLevel serverLevel)) return false;
 
-        int absorbedCount = BlockPos.iterateRecursively(
-                spongePos,
-                ABSORB_RADIUS,
-                ABSORB_LIMIT,
-                (currentPos, queuer) -> {for (Direction direction : DIRECTIONS) queuer.accept(currentPos.offset(direction));},
-                (currentPos) -> {
-                    if (currentPos.equals(spongePos)) return true;
+        return !RegionPermissionChecker.isAllowed(player.getUUID(), Rule.USE_SPONGES, pos, serverLevel);
+    }
 
-                    BlockState blockState = world.getBlockState(currentPos);
-                    FluidState fluidState = world.getFluidState(currentPos);
-
-                    if (!fluidState.isIn(FluidTags.WATER)) return false;
-
-                    boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.USE_SPONGES, currentPos);
-
-                    if (!allowed) {
-                        triedProtected.set(true);
-                        return false;
-                    }
-                    if (!(world instanceof ServerWorld serverWorld)) return false; // TODO
-                    FluidOriginTracker fluidOriginTracker = WorldRegistry.get(serverWorld)
-                            .getTrackerManager()
-                            .getFluidOriginTracker();
-
-                    Block block = blockState.getBlock();
-
-                    if (block instanceof FluidDrainable fluidDrainable) {
-                        if (!fluidDrainable.tryDrainFluid((PlayerEntity) null, world, currentPos, blockState).isEmpty()) {
-                            absorbedAnything.set(true);
-                            fluidOriginTracker.remove(currentPos);
-                            return true;
-                        }
-                    }
-
-                    if (blockState.getBlock() instanceof FluidBlock) {
-                        world.setBlockState(currentPos, Blocks.AIR.getDefaultState(), 3);
-                        absorbedAnything.set(true);
-                        fluidOriginTracker.remove(currentPos);
-                        return true;
-                    }
-
-                    if (blockState.isOf(Blocks.KELP) || blockState.isOf(Blocks.KELP_PLANT) ||
-                            blockState.isOf(Blocks.SEAGRASS) || blockState.isOf(Blocks.TALL_SEAGRASS)) {
-
-                        BlockEntity blockEntity = blockState.hasBlockEntity() ? world.getBlockEntity(currentPos) : null;
-                        Block.dropStacks(blockState, world, currentPos, blockEntity);
-                        world.setBlockState(currentPos, Blocks.AIR.getDefaultState(), 3);
-                        absorbedAnything.set(true);
-                        fluidOriginTracker.remove(currentPos);
-                        return true;
-                    }
-
-                    return false;
-                }
-        );
-
-        if (triedProtected.get()) {
-            PlayerNotification.trySend(serverPlayer, NotificationType.DENY_USE_SPONGE, Color.RED);
+    @Unique
+    private static void removeFluidTracker(BlockPos pos) {
+        if (CURRENT_PLAYER.get() != null && CURRENT_PLAYER.get().level() instanceof ServerLevel serverLevel) {
+            FluidOriginTracker tracker = WorldRegistry.get(serverLevel)
+                    .getTrackerManager()
+                    .getFluidOriginTracker();
+            tracker.remove(pos);
         }
-
-        return absorbedCount > 0 || absorbedAnything.get();
     }
 }

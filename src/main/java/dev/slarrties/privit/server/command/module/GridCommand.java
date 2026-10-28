@@ -17,26 +17,25 @@ import dev.slarrties.privit.server.command.support.feedback.CommandFeedback;
 import dev.slarrties.privit.server.command.support.argument.PlayerIdentityResolver;
 import dev.slarrties.privit.server.command.support.permission.CommandPermissions;
 
-import net.minecraft.text.Text;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.command.argument.UuidArgumentType;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.UuidArgument;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 import java.util.List;
 import java.util.UUID;
 
 public final class GridCommand implements CommandModule, PlayerAccess, OperatorAccess {
-
     @Override
-    public void register(LiteralArgumentBuilder<ServerCommandSource> root) {
-        root.then(CommandManager.literal("grid")
+    public void register(LiteralArgumentBuilder<CommandSourceStack> root) {
+        root.then(Commands.literal("grid")
                 .executes(this::hideAll)
-                .then(CommandManager.argument("region", UuidArgumentType.uuid())
-                        .then(CommandManager.literal("off").executes(ctx -> setOne(ctx, false)))
-                        .then(CommandManager.literal("on").executes(ctx -> setOne(ctx, true)))));
+                .then(Commands.argument("region", UuidArgument.uuid())
+                        .then(Commands.literal("off").executes(ctx -> setOne(ctx, false)))
+                        .then(Commands.literal("on").executes(ctx -> setOne(ctx, true)))));
     }
 
     @Override
@@ -47,51 +46,45 @@ public final class GridCommand implements CommandModule, PlayerAccess, OperatorA
         );
     }
 
-    private int hideAll(CommandContext<ServerCommandSource> ctx) throws CommandSyntaxException {
-        ServerPlayerEntity player = PlayerIdentityResolver.requirePlayer(ctx.getSource());
-
-        for (ServerWorld world : ctx.getSource().getServer().getWorlds()) {
-            WorldRegistry.get(world).getGridSubscriptions().onPlayerLeave(player.getUuid());
+    private int hideAll(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = PlayerIdentityResolver.requirePlayer(ctx.getSource());
+        for (ServerLevel level : ctx.getSource().getServer().getAllLevels()) {
+            WorldRegistry.get(level).getGridSubscriptions().onPlayerLeave(player.getUUID());
         }
-
         ServerPlayNetworking.send(player, new RegionGridClearS2CPacket());
         return CommandFeedback.success(
                 ctx.getSource(),
-                Text.translatable("privit.command.grid.cleared")
+                Component.translatable("privit.command.grid.cleared")
         );
     }
 
-    private int setOne(CommandContext<ServerCommandSource> ctx, boolean enabled)
+    private int setOne(CommandContext<CommandSourceStack> ctx, boolean enabled)
             throws CommandSyntaxException {
-        ServerCommandSource source = ctx.getSource();
-        ServerPlayerEntity player = PlayerIdentityResolver.requirePlayer(source);
-        UUID regionId = UuidArgumentType.getUuid(ctx, "region");
-
+        CommandSourceStack source = ctx.getSource();
+        ServerPlayer player = PlayerIdentityResolver.requirePlayer(source);
+        UUID regionId = UuidArgument.getUuid(ctx, "region");
         var found = RegionLookup.findById(source.getServer(), regionId);
         if (found.isEmpty()) {
             return CommandFeedback.error(
                     source,
-                    Text.translatable("privit.command.grid.not_found", regionId.toString())
+                    Component.translatable("privit.command.grid.not_found", regionId.toString())
             );
         }
-
         RegionLookup.LocatedRegion located = found.get();
         Region region = located.region();
-
-        if (!CommandPermissions.operator(source) && !region.isOwner(player.getUuid())) {
+        if (!CommandPermissions.canManage(source) && !region.isOwner(player.getUUID())) {
             return CommandFeedback.error(
                     source,
-                    Text.translatable("privit.command.grid.not_owner")
+                    Component.translatable("privit.command.grid.not_owner")
             );
         }
 
-        ServerWorld regionWorld = located.world();
-        var grids = WorldRegistry.get(regionWorld).getGridSubscriptions();
-        var session = WorldRegistry.get(regionWorld).getRegionGuiSessions().find(regionId);
+        ServerLevel regionLevel = located.level();
+        var grids = WorldRegistry.get(regionLevel).getGridSubscriptions();
+        var session = WorldRegistry.get(regionLevel).getRegionGuiSessions().find(regionId);
 
         if (enabled) {
             grids.subscribe(regionId, player);
-
             RegionGridStateS2CPacket packet;
             if (session != null) {
                 var state = session.state();
@@ -119,7 +112,7 @@ public final class GridCommand implements CommandModule, PlayerAccess, OperatorA
 
         return CommandFeedback.success(
                 source,
-                Text.translatable(
+                Component.translatable(
                         enabled ? "privit.command.grid.shown" : "privit.command.grid.hidden",
                         region.name()
                 )

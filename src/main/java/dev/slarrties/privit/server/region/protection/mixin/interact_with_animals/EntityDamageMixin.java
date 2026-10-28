@@ -3,36 +3,34 @@ package dev.slarrties.privit.server.region.protection.mixin.interact_with_animal
 import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-// shouldn't it be in this package?
 @Mixin(LivingEntity.class)
 public abstract class EntityDamageMixin {
 
-    @Inject(method = "damage", at = @At("HEAD"))
-    private void onEntityDamaged(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+    @Inject(method = "hurtServer", at = @At("HEAD"))
+    private void onEntityDamaged(ServerLevel level, DamageSource source, float damage, CallbackInfoReturnable<Boolean> cir) {
         LivingEntity target = (LivingEntity) (Object) this;
-        if (target.getWorld().isClient) return;
+        if (target.level().isClientSide()) return;
 
-        Entity attacker = source.getAttacker();
-        if (!(attacker instanceof ServerPlayerEntity player)) return;
-        if (!(target instanceof MobEntity)) return;
-        if (target.getWorld() instanceof ServerWorld serverWorld) {
-            InfluencedEntityTracker tracker = WorldRegistry.get(serverWorld)
+        Entity attacker = source.getEntity();
+        if (!(attacker instanceof ServerPlayer player)) return;
+        if (!(target instanceof Mob)) return;
+        if (target.level() instanceof ServerLevel serverLevel) {
+            InfluencedEntityTracker tracker = WorldRegistry.get(serverLevel)
                     .getTrackerManager()
                     .getInfluencedEntityTracker();
-
-            tracker.record(target, player.getUuid());
+            tracker.record(target, player.getUUID());
         }
     }
 }

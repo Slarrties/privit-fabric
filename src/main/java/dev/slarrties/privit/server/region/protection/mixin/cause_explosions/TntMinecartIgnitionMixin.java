@@ -9,15 +9,13 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.redstone.handler.RedstoneReceiverHandler;
 
-import net.minecraft.world.World;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.vehicle.TntMinecartEntity;
-import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.entity.projectile.PersistentProjectileEntity;
-import net.minecraft.entity.projectile.SmallFireballEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.entity.vehicle.minecart.MinecartTNT;
+import net.minecraft.world.damagesource.DamageSource;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -28,64 +26,58 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.UUID;
 
 @AssociatedRule({Rule.INTERACT_WITH_MINECARTS, Rule.CAUSE_EXPLOSIONS})
-@Mixin(TntMinecartEntity.class)
+@Mixin(MinecartTNT.class)
 public abstract class TntMinecartIgnitionMixin {
 
-    @Inject(method = "damage", at = @At("HEAD"))
-    private void onTntMinecartDamage(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        TntMinecartEntity minecart = (TntMinecartEntity) (Object) this;
-        World world = minecart.getWorld();
+    @Inject(method = "hurtServer", at = @At("HEAD"))
+    private void onTntMinecartDamage(ServerLevel serverLevel, DamageSource source, float damage, CallbackInfoReturnable<Boolean> cir) {
+        MinecartTNT minecart = (MinecartTNT) (Object) this;
+        UUID responsible = findResponsiblePlayer(source, serverLevel, minecart);
+        if (responsible == null) return;
 
-        if(world instanceof ServerWorld serverWorld) {
-            UUID responsible = findResponsiblePlayer(source, world, minecart);
-            if (responsible == null) return;
-
-            boolean canDamage = RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_MINECARTS, minecart.getBlockPos(), serverWorld);
-            if (!canDamage) {
-                ServerPlayerEntity serverPlayer = serverWorld.getServer()
-                        .getPlayerManager()
-                        .getPlayer(responsible);
-                PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_MINECART, Color.RED);
-                cir.cancel();
-                return;
-            }
-
-            if (isIgnitionAttempt(source)) {
-                WorldRegistry.get(serverWorld)
-                        .getTrackerManager()
-                        .getMinecartOriginTracker()
-                        .record(minecart, responsible);
-
-                WorldRegistry.get(serverWorld)
-                        .getTrackerManager()
-                        .getExplosionOriginTracker()
-                        .record(minecart, responsible);
-            }
+        boolean canDamage = RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_MINECARTS, minecart.blockPosition(), serverLevel);
+        if (!canDamage) {
+            ServerPlayer serverPlayer = serverLevel.getServer()
+                    .getPlayerList()
+                    .getPlayer(responsible);
+            PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_MINECART, Color.RED);
+            cir.setReturnValue(false);
+            return;
         }
+
+        if (isIgnitionAttempt(source)) {
+            WorldRegistry.get(serverLevel)
+                    .getTrackerManager()
+                    .getMinecartOriginTracker()
+                    .record(minecart, responsible);
+            WorldRegistry.get(serverLevel)
+                    .getTrackerManager()
+                    .getExplosionOriginTracker()
+                    .record(minecart, responsible);
+        }
+
     }
 
     @Unique
-    private UUID findResponsiblePlayer(DamageSource source, World world, TntMinecartEntity minecart) {
-        if (source.getAttacker() instanceof ServerPlayerEntity player) return player.getUuid();
+    private UUID findResponsiblePlayer(DamageSource source, Level level, MinecartTNT minecart) {
+        if (source.getEntity() instanceof ServerPlayer player) return player.getUUID();
 
-        Entity sourceEntity = source.getSource();
+        Entity sourceEntity = source.getDirectEntity();
+        if (sourceEntity instanceof Projectile projectile) {
+            if (projectile.getOwner() instanceof ServerPlayer owner) {
+                return owner.getUUID();
+            }
+        }
 
-        if (sourceEntity instanceof PersistentProjectileEntity || sourceEntity instanceof SmallFireballEntity) {
-            if (sourceEntity instanceof ProjectileEntity projectile) {
-                if (projectile.getOwner() instanceof ServerPlayerEntity owner) {
-                    return owner.getUuid();
-                }
-            }
-            if (world instanceof ServerWorld serverWorld) {
-                return RedstoneReceiverHandler.findResponsiblePlayer(serverWorld, minecart.getBlockPos());
-            }
+        if (level instanceof ServerLevel serverLevel) {
+            return RedstoneReceiverHandler.findResponsiblePlayer(serverLevel, minecart.blockPosition());
         }
         return null;
     }
 
     @Unique
     private boolean isIgnitionAttempt(DamageSource source) {
-        Entity sourceEntity = source.getSource();
-        return sourceEntity instanceof PersistentProjectileEntity p && p.isOnFire() || sourceEntity instanceof SmallFireballEntity;
+        Entity sourceEntity = source.getDirectEntity();
+        return sourceEntity instanceof Projectile p && p.isOnFire();
     }
 }

@@ -9,16 +9,14 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 import dev.slarrties.privit.server.tracking.protection.FluidOriginTracker;
 
-import net.minecraft.world.World;
-import net.minecraft.world.BlockView;
-import net.minecraft.block.BlockState;
-import net.minecraft.fluid.Fluid;
-import net.minecraft.fluid.FluidState;
-import net.minecraft.fluid.FlowableFluid;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.FlowingFluid;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -29,39 +27,39 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.UUID;
 
 @AssociatedRule(Rule.USE_FLUIDS)
-@Mixin(FlowableFluid.class)
+@Mixin(FlowingFluid.class)
 public abstract class FluidPropagateMixin {
 
-    @Inject(method = "canFlow", at = @At("HEAD"), cancellable = true)
-    private void onCanFlow(BlockView world, BlockPos fromPos, BlockState fromState, Direction direction,
-                           BlockPos toPos, BlockState toState, FluidState toFluidState, Fluid fluid,
+    @Inject(method = "canMaybePassThrough", at = @At("HEAD"), cancellable = true)
+    private void onCanFlow(BlockGetter level, BlockPos sourcePos, BlockState sourceState, Direction direction,
+                           BlockPos testPos, BlockState testState, FluidState testFluidState,
                            CallbackInfoReturnable<Boolean> cir) {
-        if (!(world instanceof ServerWorld serverWorld)) return;
+        if (!(level instanceof ServerLevel serverLevel)) return;
 
-        FluidOriginTracker fluidOriginTracker = WorldRegistry.get(serverWorld)
+        FluidOriginTracker fluidOriginTracker = WorldRegistry.get(serverLevel)
                 .getTrackerManager()
                 .getFluidOriginTracker();
 
-        UUID ownerUuid = fluidOriginTracker.getResponsible(fromPos);
-        if (ownerUuid == null) ownerUuid = findOwnerFromNeighbors(fromPos, serverWorld);
+        UUID ownerUuid = fluidOriginTracker.getResponsible(sourcePos);
+        if (ownerUuid == null) ownerUuid = findOwnerFromNeighbors(sourcePos, serverLevel);
         if (ownerUuid == null) return;
 
-        boolean allowed = RegionPermissionChecker.isAllowed(ownerUuid, Rule.USE_FLUIDS, toPos, serverWorld);
+        boolean allowed = RegionPermissionChecker.isAllowed(ownerUuid, Rule.USE_FLUIDS, testPos, serverLevel);
         if (!allowed) {
-            ServerPlayerEntity serverPlayer = serverWorld.getServer()
-                    .getPlayerManager()
+            ServerPlayer serverPlayer = serverLevel.getServer()
+                    .getPlayerList()
                     .getPlayer(ownerUuid);
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_SPREAD_LIQUID, Color.RED);
             cir.setReturnValue(false);
         }
     }
 
-    @Inject(method = "getUpdatedState", at = @At("RETURN"))
-    private void onFlowUpdated(World world, BlockPos pos, BlockState state, CallbackInfoReturnable<FluidState> cir) {
-        if (world.isClient() || !(world instanceof ServerWorld serverWorld)) return;
-
+    @Inject(method = "getNewLiquid", at = @At("RETURN"))
+    private void onFlowUpdated(ServerLevel level, BlockPos pos, BlockState state, CallbackInfoReturnable<FluidState> cir) {
         FluidState newState = cir.getReturnValue();
-        FluidOriginTracker fluidOriginTracker = WorldRegistry.get(serverWorld)
+        FluidState oldFluid = state.getFluidState();
+
+        FluidOriginTracker fluidOriginTracker = WorldRegistry.get(level)
                 .getTrackerManager()
                 .getFluidOriginTracker();
 
@@ -71,43 +69,72 @@ public abstract class FluidPropagateMixin {
         }
 
         UUID ownerUuid = fluidOriginTracker.getResponsible(pos);
-        if (ownerUuid == null) ownerUuid = findOwnerFromNeighbors(pos, serverWorld);
+        if (ownerUuid == null) ownerUuid = findOwnerFromNeighbors(pos, level);
         if (ownerUuid == null) return;
-
-        if (!RegionPermissionChecker.isAllowed(ownerUuid, Rule.USE_FLUIDS, pos, serverWorld)) {
+        if (!RegionPermissionChecker.isAllowed(ownerUuid, Rule.USE_FLUIDS, pos, level)) {
             fluidOriginTracker.remove(pos);
             return;
         }
 
-        propagateToNeighbors(serverWorld, pos, newState);
+        if (!oldFluid.isEmpty() && !newState.isEmpty()) {
+            int oldLevel = oldFluid.getAmount();
+            int newLevel = newState.getAmount();
+
+            if (newLevel != oldLevel) {
+                if (newLevel == 0) {
+                    fluidOriginTracker.remove(pos);
+                } else {
+                    propagateToNeighbors(level, pos, newState);
+                }
+            }
+        } else if (oldFluid.isEmpty() && !newState.isEmpty()) {
+            handleFirstFluidAppearance(level, pos);
+        }
     }
 
     @Unique
-    private UUID findOwnerFromNeighbors(BlockPos pos, ServerWorld world) {
-        FluidOriginTracker fluidOriginTracker = WorldRegistry.get(world)
+    private UUID findOwnerFromNeighbors(BlockPos pos, ServerLevel level) {
+        FluidOriginTracker fluidOriginTracker = WorldRegistry.get(level)
                 .getTrackerManager()
                 .getFluidOriginTracker();
-
         for (Direction dir : Direction.values()) {
-            UUID owner = fluidOriginTracker.getResponsible(pos.offset(dir));
+            UUID owner = fluidOriginTracker.getResponsible(pos.relative(dir));
             if (owner != null) return owner;
         }
         return null;
     }
 
     @Unique
-    private void propagateToNeighbors(ServerWorld world, BlockPos pos, FluidState newState) {
-        FluidOriginTracker fluidOriginTracker = WorldRegistry.get(world)
+    private void propagateToNeighbors(ServerLevel level, BlockPos pos, FluidState newState) {
+        FluidOriginTracker fluidOriginTracker = WorldRegistry.get(level)
                 .getTrackerManager()
                 .getFluidOriginTracker();
 
         for (Direction dir : Direction.values()) {
-            BlockPos neighborPos = pos.offset(dir);
-            FluidState neighborFluid = world.getFluidState(neighborPos);
+            BlockPos neighborPos = pos.relative(dir);
+            FluidState neighborFluid = level.getFluidState(neighborPos);
 
-            if (!neighborFluid.isEmpty() && neighborFluid.getFluid() == newState.getFluid()) {
+            if (!neighborFluid.isEmpty() && neighborFluid.getType() == newState.getType()) {
                 fluidOriginTracker.propagate(pos, neighborPos);
             }
         }
+    }
+
+    @Unique
+    private void handleFirstFluidAppearance(ServerLevel level, BlockPos pos) {
+        FluidState currentFluid = level.getFluidState(pos);
+        if (currentFluid.isEmpty()) return;
+
+        FluidOriginTracker fluidOriginTracker = WorldRegistry.get(level)
+                .getTrackerManager()
+                .getFluidOriginTracker();
+        BlockPos above = pos.above();
+        FluidState aboveFluid = level.getFluidState(above);
+
+        if (!aboveFluid.isEmpty() && aboveFluid.getType() == currentFluid.getType()) {
+            fluidOriginTracker.propagate(above, pos);
+            return;
+        }
+        propagateToNeighbors(level, pos, currentFluid);
     }
 }

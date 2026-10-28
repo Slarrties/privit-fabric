@@ -6,15 +6,15 @@ import dev.slarrties.privit.common.notification.NotificationType;
 import dev.slarrties.privit.server.util.PlayerNotification;
 import dev.slarrties.privit.server.world.WorldRegistry;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
-import dev.slarrties.privit.server.region.protection.handler.RuleEventHandler;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
+import dev.slarrties.privit.server.region.protection.handler.RuleEventHandler;
 import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 
-import net.minecraft.item.Items;
-import net.minecraft.util.ActionResult;
-import net.minecraft.entity.vehicle.BoatEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.vehicle.boat.Boat;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 
@@ -28,40 +28,36 @@ public final class InteractionBoatHandler implements RuleEventHandler {
 
     @Override
     public void register() {
-        UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
-            if (!(player instanceof ServerPlayerEntity serverPlayer) || world.isClient) return ActionResult.PASS;
-            if (!(entity instanceof BoatEntity boat)) return ActionResult.PASS;
+        UseEntityCallback.EVENT.register((player, level, hand, entity, hitResult) -> {
+            if (!(player instanceof ServerPlayer serverPlayer) || level.isClientSide()) return InteractionResult.PASS;
+            if (!(entity instanceof Boat boat)) return InteractionResult.PASS;
 
-            boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_BOATS, boat.getBlockPos());
-
+            boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_BOATS, boat.blockPosition());
             if (!allowed) {
                 PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_BOAT, Color.RED);
-                return ActionResult.FAIL;
+                return InteractionResult.FAIL;
             }
 
-            if (player.getStackInHand(hand).isOf(Items.LEAD)) {
-                InfluencedEntityTracker entityTracker = WorldRegistry.get((ServerWorld) world)
+            if (player.getItemInHand(hand).is(Items.LEAD)) {
+                InfluencedEntityTracker entityTracker = WorldRegistry.get((ServerLevel) level)
                         .getTrackerManager()
                         .getInfluencedEntityTracker();
-
-                for (var passenger : boat.getPassengerList()) {
-                    entityTracker.record(passenger, serverPlayer.getUuid());
+                for (var passenger : boat.getPassengers()) {
+                    entityTracker.record(passenger, serverPlayer.getUUID());
                 }
             }
-
-            return ActionResult.PASS;
+            return InteractionResult.PASS;
         });
 
-        AttackEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
-            if (!(player instanceof ServerPlayerEntity serverPlayer)) return ActionResult.PASS;
-            if (!(entity instanceof BoatEntity)) return ActionResult.PASS;
+        AttackEntityCallback.EVENT.register((player, level, hand, entity, hitResult) -> {
+            if (!(player instanceof ServerPlayer serverPlayer)) return InteractionResult.PASS;
+            if (!(entity instanceof Boat)) return InteractionResult.PASS;
 
-            boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_BOATS, entity.getBlockPos());
-            if (allowed) return ActionResult.PASS;
+            boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.INTERACT_WITH_BOATS, entity.blockPosition());
+            if (allowed) return InteractionResult.PASS;
 
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_INTERACT_BOAT, Color.RED);
-
-            return ActionResult.FAIL;
+            return InteractionResult.FAIL;
         });
     }
 }

@@ -2,68 +2,69 @@ package dev.slarrties.privit.client.gui.widget;
 
 import dev.slarrties.privit.PrivitMod;
 
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.Drawable;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.Selectable;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.screen.ButtonTextures;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.Renderable;
+import net.minecraft.client.gui.components.WidgetSprites;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.narration.NarratableEntry;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
 
-public class ConfirmPanelWidget implements Element, Selectable, Drawable {
-
+public class ConfirmPanelWidget implements GuiEventListener, Renderable, NarratableEntry {
     private final int x;
     private final int y;
     private final int width;
     private final int height;
     private boolean visible = false;
-    private final ButtonWidget.PressAction acceptAction;
-    private final ButtonWidget.PressAction cancelAction;
 
+    private final Button.OnPress acceptAction;
+    private final Button.OnPress cancelAction;
     private GuiButton acceptButton;
     private GuiButton cancelButton;
-    private final Text confirmText;
+    private final Component confirmText;
 
-    private static final Identifier ACCEPT_ICON = Identifier.of(PrivitMod.MOD_ID, "textures/gui/accept_changes_icon.png");
-    private static final Identifier CANCEL_ICON = Identifier.of(PrivitMod.MOD_ID, "textures/gui/delete_region_icon.png");
-    private static final Identifier BACKGROUND = Identifier.of(PrivitMod.MOD_ID, "textures/gui/confirm_background.png");
-    private static final ButtonTextures BUTTON_BACKGROUND = new ButtonTextures(
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_paper_common.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_paper_pressed.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/button_paper_active.png")
+    private static final Identifier ACCEPT_ICON = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/accept_changes_icon.png");
+    private static final Identifier CANCEL_ICON = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/delete_region_icon.png");
+    private static final Identifier BACKGROUND = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/confirm_background.png");
+
+    private static final WidgetSprites BUTTON_BACKGROUND = new WidgetSprites(
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_paper_common.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_paper_pressed.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/button_paper_active.png")
     );
 
     public ConfirmPanelWidget(int x, int y, int width, int height,
-                              ButtonWidget.PressAction acceptAction,
-                              ButtonWidget.PressAction cancelAction) {
+                              Button.OnPress acceptAction,
+                              Button.OnPress cancelAction) {
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
-        this.confirmText = Text.translatable("privit.gui.text.confirm_changes");
+        this.confirmText = Component.translatable("privit.gui.text.confirm_changes");
         this.acceptAction = acceptAction;
         this.cancelAction = cancelAction;
-
         initButtons();
     }
 
     private void initButtons() {
         int size = 20;
 
-        acceptButton = new GuiButton.Builder(Text.empty(), acceptAction)
-                .dimensions(x + width/2 - size - 6, y + height - size - 8, size, size)
-                .tooltip(Tooltip.of(Text.translatable("privit.gui.button.accept_changes")))
+        acceptButton = new GuiButton.Builder(Component.empty(), acceptAction)
+                .dimensions(x + width / 2 - size - 6, y + height - size - 8, size, size)
+                .tooltip(Tooltip.create(Component.translatable("privit.gui.button.accept_changes")))
                 .icon(ACCEPT_ICON, size, size, 0, -2)
                 .setBackground(BUTTON_BACKGROUND)
                 .build();
 
-        cancelButton = new GuiButton.Builder(Text.empty(), cancelAction)
-                .dimensions(x + width/2 + 6, y + height - size - 8, size, size)
-                .tooltip(Tooltip.of(Text.translatable("privit.gui.button.cancel_changes")))
+        cancelButton = new GuiButton.Builder(Component.empty(), cancelAction)
+                .dimensions(x + width / 2 + 6, y + height - size - 8, size, size)
+                .tooltip(Tooltip.create(Component.translatable("privit.gui.button.cancel_changes")))
                 .icon(CANCEL_ICON, size, size, 0, -2)
                 .setBackground(BUTTON_BACKGROUND)
                 .build();
@@ -75,26 +76,38 @@ public class ConfirmPanelWidget implements Element, Selectable, Drawable {
         cancelButton.visible = visible;
     }
 
-    public boolean isVisible() {
-        return visible;
-    }
+    public boolean isVisible() { return visible; }
 
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    @Override
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         if (!visible) return;
 
-        context.drawTexture(BACKGROUND, x, y, 0, 0, width, height, width, height);
-        context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer,
-                confirmText, x + width / 2, y + 6, 0xFFFFFF);
+        graphics.blit(
+                RenderPipelines.GUI_TEXTURED,
+                BACKGROUND,
+                x, y,
+                0, 0,
+                width, height,
+                width, height
+        );
 
-        acceptButton.render(context, mouseX, mouseY, delta);
-        cancelButton.render(context, mouseX, mouseY, delta);
+        graphics.centeredText(
+                Minecraft.getInstance().font,
+                confirmText,
+                x + width / 2,
+                y + 6,
+                0xFFFFFFFF
+        );
+
+        acceptButton.extractRenderState(graphics, mouseX, mouseY, delta);
+        cancelButton.extractRenderState(graphics, mouseX, mouseY, delta);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         if (!visible) return false;
-        return acceptButton.mouseClicked(mouseX, mouseY, button) ||
-                cancelButton.mouseClicked(mouseX, mouseY, button);
+        return acceptButton.mouseClicked(event, doubleClick) ||
+                cancelButton.mouseClicked(event, doubleClick);
     }
 
     @Override
@@ -106,15 +119,11 @@ public class ConfirmPanelWidget implements Element, Selectable, Drawable {
     public void setFocused(boolean focused) {}
 
     @Override
-    public boolean isFocused() {
-        return false;
-    }
+    public boolean isFocused() { return false; }
 
     @Override
-    public SelectionType getType() {
-        return SelectionType.NONE;
-    }
+    public NarrationPriority narrationPriority() { return NarratableEntry.NarrationPriority.NONE; }
 
     @Override
-    public void appendNarrations(NarrationMessageBuilder builder) {}
+    public void updateNarration(NarrationElementOutput output) {}
 }

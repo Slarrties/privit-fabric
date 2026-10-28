@@ -8,12 +8,12 @@ import dev.slarrties.privit.server.tracking.context.EntitySpawnContext;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.item.SpawnEggItem;
-import net.minecraft.item.ItemUsageContext;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.SpawnEggItem;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.server.level.ServerPlayer;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -25,30 +25,29 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class SpawnEggUseOnBlockMixin {
 
     @Inject(
-            method = "useOnBlock(Lnet/minecraft/item/ItemUsageContext;)Lnet/minecraft/util/ActionResult;",
+            method = "useOn(Lnet/minecraft/world/item/context/UseOnContext;)Lnet/minecraft/world/InteractionResult;",
             at = @At("HEAD"),
             cancellable = true
     )
-    private void preventSpawnEggOnProtectedBlock(ItemUsageContext context, CallbackInfoReturnable<ActionResult> cir) {
-        if (!(context.getPlayer() instanceof ServerPlayerEntity serverPlayer)) return;
+    private void preventSpawnEggOnProtectedBlock(UseOnContext context, CallbackInfoReturnable<InteractionResult> cir) {
+        if (!(context.getPlayer() instanceof ServerPlayer serverPlayer)) return;
 
-        BlockPos pos = context.getBlockPos();
-        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer, Rule.USE_SPAWN_EGGS, pos);
-
+        BlockPos pos = context.getClickedPos();
+        boolean allowed = RegionPermissionChecker.isAllowed(serverPlayer.getUUID(), Rule.USE_SPAWN_EGGS, pos, serverPlayer.level());
         if (!allowed) {
             PlayerNotification.trySend(serverPlayer, NotificationType.DENY_USE_SPAWN_EGG, Color.RED);
-            cir.setReturnValue(ActionResult.FAIL);
+            cir.setReturnValue(InteractionResult.FAIL);
             return;
         }
 
-        EntitySpawnContext.push(serverPlayer, Vec3d.of(pos.offset(context.getSide())));
+        EntitySpawnContext.push(serverPlayer, Vec3.atLowerCornerOf(pos.relative(context.getClickedFace())));
     }
 
     @Inject(
-            method = "useOnBlock(Lnet/minecraft/item/ItemUsageContext;)Lnet/minecraft/util/ActionResult;",
+            method = "useOn(Lnet/minecraft/world/item/context/UseOnContext;)Lnet/minecraft/world/InteractionResult;",
             at = @At("RETURN")
     )
-    private void popSpawnEggContext(ItemUsageContext context, CallbackInfoReturnable<ActionResult> cir) {
+    private void popSpawnEggContext(UseOnContext context, CallbackInfoReturnable<InteractionResult> cir) {
         EntitySpawnContext.pop();
     }
 }

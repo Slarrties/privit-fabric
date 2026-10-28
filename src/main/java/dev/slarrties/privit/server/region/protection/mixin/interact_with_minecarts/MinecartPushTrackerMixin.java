@@ -7,12 +7,12 @@ import dev.slarrties.privit.server.tracking.protection.MinecartFuelTracker;
 import dev.slarrties.privit.server.tracking.protection.MinecartOriginTracker;
 import dev.slarrties.privit.server.tracking.protection.InfluencedEntityTracker;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.vehicle.AbstractMinecartEntity;
-import net.minecraft.entity.vehicle.FurnaceMinecartEntity;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
+import net.minecraft.world.entity.vehicle.minecart.MinecartFurnace;
 
-import net.minecraft.server.world.ServerWorld;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -22,30 +22,32 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.UUID;
 
 @AssociatedRule(Rule.INTERACT_WITH_MINECARTS)
-@Mixin(AbstractMinecartEntity.class)
+@Mixin(AbstractMinecart.class)
 public abstract class MinecartPushTrackerMixin {
 
-    @Inject(method = "pushAwayFrom", at = @At("HEAD"))
+    @Inject(method = "push", at = @At("HEAD"))
     private void trackMinecartPush(Entity entity, CallbackInfo ci) {
-        AbstractMinecartEntity minecart = (AbstractMinecartEntity) (Object) this;
+        AbstractMinecart minecart = (AbstractMinecart) (Object) this;
+        if (minecart.level() instanceof ServerLevel serverLevel) {
+            MinecartOriginTracker minecartOriginTracker = WorldRegistry.get(serverLevel)
+                    .getTrackerManager()
+                    .getMinecartOriginTracker();
+            MinecartFuelTracker minecartFuelTracker = WorldRegistry.get(serverLevel)
+                    .getTrackerManager()
+                    .getMinecartFuelTracker();
 
-        if (minecart.getWorld() instanceof ServerWorld serverWorld) {
-            MinecartOriginTracker minecartOriginTracker = WorldRegistry.get(serverWorld).getTrackerManager().getMinecartOriginTracker();
-            MinecartFuelTracker minecartFuelTracker = WorldRegistry.get(serverWorld).getTrackerManager().getMinecartFuelTracker();
-
-            if (entity instanceof ServerPlayerEntity player) {
-                minecartOriginTracker.record(minecart, player.getUuid());
-                this.propogateResponsibleToEntity(player.getUuid());
-            } else if (entity instanceof FurnaceMinecartEntity furnaceCart) {
-                UUID responsible = minecartFuelTracker.getResponsiblePlayer(furnaceCart);
-
+            if (entity instanceof ServerPlayer player) {
+                minecartOriginTracker.record(minecart, player.getUUID());
+                this.propogateResponsibleToEntity(player.getUUID());
+            } else if (entity instanceof MinecartFurnace furnaceCart) {
+                UUID responsible = minecartFuelTracker.getResponsible(furnaceCart);
                 if (responsible != null) {
                     minecartOriginTracker.record(minecart, responsible);
                     this.propogateResponsibleToEntity(responsible);
                 }
-            } else if (entity instanceof AbstractMinecartEntity otherCart) {
+            } else if (entity instanceof AbstractMinecart otherCart) {
                 minecartOriginTracker.propagate(otherCart, minecart);
-                UUID responsible = minecartOriginTracker.getResponsiblePlayer(otherCart);
+                UUID responsible = minecartOriginTracker.getResponsible(otherCart);
                 if (responsible != null) this.propogateResponsibleToEntity(responsible);
             }
         }
@@ -53,13 +55,11 @@ public abstract class MinecartPushTrackerMixin {
 
     @Unique
     private void propogateResponsibleToEntity(UUID responsible) {
-        AbstractMinecartEntity minecart = (AbstractMinecartEntity) (Object) this;
-
-        if(minecart.getWorld() instanceof ServerWorld serverWorld) {
-            InfluencedEntityTracker entityTracker = WorldRegistry.get(serverWorld).getTrackerManager().getInfluencedEntityTracker();
-
-            for (Entity entity : minecart.getPassengerList()) {
-                if (!(entity instanceof ServerPlayerEntity)) {
+        AbstractMinecart minecart = (AbstractMinecart) (Object) this;
+        if (minecart.level() instanceof ServerLevel serverLevel) {
+            InfluencedEntityTracker entityTracker = WorldRegistry.get(serverLevel).getTrackerManager().getInfluencedEntityTracker();
+            for (Entity entity : minecart.getPassengers()) {
+                if (!(entity instanceof ServerPlayer)) {
                     entityTracker.record(entity, responsible);
                 }
             }

@@ -14,11 +14,13 @@ import dev.slarrties.privit.common.notification.NotificationType;
 import dev.slarrties.privit.common.network.payload.c2s.RegionUpdateC2SPacket;
 import dev.slarrties.privit.common.network.payload.c2s.RegionGuiCancelC2SPacket;
 
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ButtonTextures;
+import net.minecraft.resources.Identifier;
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.WidgetSprites;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 
 import java.util.Map;
@@ -39,22 +41,24 @@ public class RegionScreen extends Screen {
 
     private static final int BG_WIDTH = 210;
     private static final int BG_HEIGHT = 180;
-    private static final Identifier BACKGROUND = Identifier.of(PrivitMod.MOD_ID, "textures/gui/region_gui_background.png");
-    private static final Identifier BACKGROUND_BLUEPRINT = Identifier.of(PrivitMod.MOD_ID, "textures/gui/blueprint_background.png");
-    private static final Identifier BACKGROUND_BOOK = Identifier.of(PrivitMod.MOD_ID, "textures/gui/book_background.png");
-    private static final ButtonTextures WIDE_BUTTON_BACKGROUND = new ButtonTextures(
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common_pressed.png"),
-            Identifier.of(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common_active.png")
+
+    private static final Identifier BACKGROUND = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/region_gui_background.png");
+    private static final Identifier BACKGROUND_BLUEPRINT = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/blueprint_background.png");
+    private static final Identifier BACKGROUND_BOOK = Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/book_background.png");
+
+    private static final WidgetSprites WIDE_BUTTON_BACKGROUND = new WidgetSprites(
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common_pressed.png"),
+            Identifier.fromNamespaceAndPath(PrivitMod.MOD_ID, "textures/gui/wide_button_bg_common_active.png")
     );
 
     public RegionScreen(RegionGuiController controller) {
-        super(Text.empty());
+        super(Component.empty());
         this.controller = controller;
     }
 
     public RegionScreen(RegionGuiController controller, Tab initialTab) {
-        super(Text.empty());
+        super(Component.empty());
         this.controller = controller;
         this.currentTab = (initialTab != null) ? initialTab : Tab.REGION_PROPERTIES;
     }
@@ -63,9 +67,11 @@ public class RegionScreen extends Screen {
     protected void init() {
         if (this.controller == null) {
             PrivitMod.LOGGER.warn("[RegionScreen] State is null: closing screen");
-            if (client != null && client.player != null)
+
+            if (this.minecraft != null && this.minecraft.player != null)
                 NotificationHudOverlay.showNotification(NotificationType.REGION_NOT_FOUND, Color.RED);
-            close();
+
+            this.onClose();
             return;
         }
 
@@ -76,11 +82,12 @@ public class RegionScreen extends Screen {
         int panelWidth = BG_WIDTH - 16;
         int panelHeight = BG_HEIGHT - 70;
 
-        tabs.put(Tab.REGION_PROPERTIES, new RegionPropertiesTab(this.controller, textRenderer, panelX, panelY, panelWidth, panelHeight));
-        tabs.put(Tab.PLAYER_GROUPS, new RegionGroupsTab(this.controller, textRenderer, panelX, panelY, panelWidth, panelHeight));
+        tabs.put(Tab.REGION_PROPERTIES, new RegionPropertiesTab(this.controller, this.font, panelX, panelY, panelWidth, panelHeight));
+        tabs.put(Tab.PLAYER_GROUPS, new RegionGroupsTab(this.controller, this.font, panelX, panelY, panelWidth, panelHeight));
+
         tabs.forEach((tabType, tab) -> {
             tab.init(panelX, panelY, panelWidth, panelHeight);
-            tab.getWidgets().forEach(this::addDrawableChild);
+            tab.getWidgets().forEach(this::addRenderableWidget);
             tab.setVisible(tabType == currentTab);
         });
 
@@ -93,7 +100,7 @@ public class RegionScreen extends Screen {
                 button -> acceptChanges(),
                 button -> cancelChanges()
         );
-        addDrawableChild(confirmPanel);
+        this.addRenderableWidget(confirmPanel);
 
         initTabButtons(backgroundX, backgroundY);
         updateTabButtonVisuals();
@@ -107,28 +114,26 @@ public class RegionScreen extends Screen {
         int centerX = (width / 2) + 1;
 
         tabPropertiesButton = new GuiButton.Builder(
-                Text.translatable("privit.gui.button.properties"),
+                Component.translatable("privit.gui.button.properties"),
                 btn -> setCurrentTab(Tab.REGION_PROPERTIES))
                 .dimensions(centerX - tabWidth - 2, tabY, tabWidth, tabHeight)
                 .setBackground(WIDE_BUTTON_BACKGROUND)
                 .build();
-        addDrawableChild(tabPropertiesButton);
+        addRenderableWidget(tabPropertiesButton);
 
         tabGroupsButton = new GuiButton.Builder(
-                Text.translatable("privit.gui.button.groups"),
+                Component.translatable("privit.gui.button.groups"),
                 btn -> setCurrentTab(Tab.PLAYER_GROUPS))
                 .dimensions(centerX + 2, tabY, tabWidth, tabHeight)
                 .setBackground(WIDE_BUTTON_BACKGROUND)
                 .build();
-        addDrawableChild(tabGroupsButton);
+        addRenderableWidget(tabGroupsButton);
     }
 
     private void setCurrentTab(Tab newTab) {
         if (currentTab == newTab) return;
         currentTab = newTab;
-
         tabs.forEach((tabType, tab) -> tab.setVisible(tabType == currentTab));
-
         updateTabButtonVisuals();
         updateConfirmPanelVisibility();
     }
@@ -142,7 +147,6 @@ public class RegionScreen extends Screen {
         boolean isCreated = !this.controller.getLocalState().isCreated();
         boolean hasChanges = this.controller.getLocalState().isChanged();
         boolean showConfirm = !isCreated && hasChanges;
-
         confirmPanel.setVisible(showConfirm);
     }
 
@@ -164,43 +168,49 @@ public class RegionScreen extends Screen {
     public RegionGuiController getController() { return controller; }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
-
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         ITabPanel activeTab = tabs.get(currentTab);
 
-        if (activeTab != null) {
-            activeTab.render(context, mouseX, mouseY, delta);
-        }
-
-        super.render(context, mouseX, mouseY, delta);
-
-        if (activeTab != null) {
-            activeTab.renderPendingTooltips(context);
-        }
+        if (activeTab != null) activeTab.extractRenderState(graphics, mouseX, mouseY, delta);
+        super.extractRenderState(graphics, mouseX, mouseY, delta);
+        if (activeTab != null) activeTab.renderPendingTooltips(graphics);
     }
 
     @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         int x = (width - BG_WIDTH) / 2;
         int y = (height - BG_HEIGHT) / 2;
 
-        context.fillGradient(0, 0, width, height, 0xC0101010, 0xD0101010);
-        context.drawTexture(BACKGROUND, x, y, 0, 0, BG_WIDTH, BG_HEIGHT, BG_WIDTH, BG_HEIGHT);
-        context.drawTexture(currentTab == Tab.REGION_PROPERTIES ? BACKGROUND_BLUEPRINT : BACKGROUND_BOOK,
-                x, y, 0, 0,BG_WIDTH, BG_HEIGHT, BG_WIDTH, BG_HEIGHT);
+        graphics.fillGradient(0, 0, width, height, 0xC0101010, 0xD0101010);
+
+        graphics.blit(
+                RenderPipelines.GUI_TEXTURED,
+                BACKGROUND,
+                x, y, 0, 0,
+                BG_WIDTH, BG_HEIGHT,
+                BG_WIDTH, BG_HEIGHT
+        );
+
+        graphics.blit(
+                RenderPipelines.GUI_TEXTURED,
+                currentTab == Tab.REGION_PROPERTIES ? BACKGROUND_BLUEPRINT : BACKGROUND_BOOK,
+                x, y, 0, 0,
+                BG_WIDTH, BG_HEIGHT,
+                BG_WIDTH, BG_HEIGHT
+        );
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         ITabPanel activeTab = tabs.get(currentTab);
 
-        if (activeTab != null && activeTab.mouseClicked(mouseX, mouseY, button))
-            return true;
-        if (confirmPanel.isVisible() && confirmPanel.mouseClicked(mouseX, mouseY, button))
+        if (activeTab != null && activeTab.mouseClicked(event, doubleClick))
             return true;
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        if (confirmPanel.isVisible() && confirmPanel.mouseClicked(event, doubleClick))
+            return true;
+
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
@@ -215,8 +225,8 @@ public class RegionScreen extends Screen {
     }
 
     @Override
-    public void close() { super.close(); }
+    public void onClose() { super.onClose(); }
 
     @Override
-    public boolean shouldPause() { return false; }
+    public boolean isPauseScreen() { return false; }
 }

@@ -7,15 +7,15 @@ import dev.slarrties.privit.common.network.payload.s2c.HudNotificationS2CPacket;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.world.RaycastContext;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.block.enums.TrialSpawnerState;
-import net.minecraft.block.spawner.TrialSpawnerLogic;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.block.entity.trialspawner.TrialSpawner;
+import net.minecraft.world.level.block.entity.trialspawner.TrialSpawnerState;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
 
 @AssociatedRule(Rule.USE_TRIAL_MECHANICS)
-@Mixin(TrialSpawnerLogic.class)
+@Mixin(TrialSpawner.class)
 public abstract class TrialSpawnerLogicProtectionMixin {
 
     @Unique
@@ -40,25 +40,25 @@ public abstract class TrialSpawnerLogicProtectionMixin {
             method = "tickServer",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/block/spawner/TrialSpawnerLogic;setSpawnerState(Lnet/minecraft/world/World;Lnet/minecraft/block/enums/TrialSpawnerState;)V"
+                    target = "Lnet/minecraft/world/level/block/entity/trialspawner/TrialSpawner;setState(Lnet/minecraft/world/level/Level;Lnet/minecraft/world/level/block/entity/trialspawner/TrialSpawnerState;)V"
             ),
             cancellable = true
     )
-    private void checkPermissionBeforeStateChange(ServerWorld world, BlockPos pos, boolean ominous, CallbackInfo ci) {
-        if (world.isClient()) return;
+    private void checkPermissionBeforeStateChange(ServerLevel level, BlockPos pos, boolean ominous, CallbackInfo ci) {
+        if (level.isClientSide()) return;
 
-        List<ServerPlayerEntity> nearbyPlayers = world.getEntitiesByClass(
-                ServerPlayerEntity.class,
-                new Box(pos).expand(15),
+        List<ServerPlayer> nearbyPlayers = level.getEntitiesOfClass(
+                ServerPlayer.class,
+                new AABB(pos).inflate(15),
                 player -> true
         );
 
         boolean hasAuthorizedPlayer = false;
         boolean shouldNotify = false;
 
-        for (ServerPlayerEntity player : nearbyPlayers) {
-            boolean hasPermission = RegionPermissionChecker.isAllowed(player, Rule.USE_TRIAL_MECHANICS, pos);
-            boolean hasLineOfSight = hasLineOfSightToSpawner(world, pos, player);
+        for (ServerPlayer player : nearbyPlayers) {
+            boolean hasPermission = RegionPermissionChecker.isAllowed(player.getUUID(), Rule.USE_TRIAL_MECHANICS, pos, level);
+            boolean hasLineOfSight = hasLineOfSightToSpawner(level, pos, player);
 
             if (hasPermission) {
                 hasAuthorizedPlayer = true;
@@ -68,37 +68,36 @@ public abstract class TrialSpawnerLogicProtectionMixin {
         }
 
         if (!hasAuthorizedPlayer) {
-            forceSafeState((TrialSpawnerLogic) (Object) this, world, pos);
+            forceSafeState((TrialSpawner) (Object) this, level, pos);
             ci.cancel();
 
-            if (shouldNotify && world.getTime() - lastNotificationTick >= NOTIFICATION_COOLDOWN) {
-                sendNotificationsToUnauthorizedPlayers(world, pos, nearbyPlayers);
-                lastNotificationTick = world.getTime();
+            if (shouldNotify && level.getGameTime() - lastNotificationTick >= NOTIFICATION_COOLDOWN) {
+                sendNotificationsToUnauthorizedPlayers(level, pos, nearbyPlayers);
+                lastNotificationTick = level.getGameTime();
             }
         }
     }
 
     @Unique
-    private boolean hasLineOfSightToSpawner(ServerWorld world, BlockPos spawnerPos, ServerPlayerEntity player) {
-        Vec3d spawnerCenter = Vec3d.ofCenter(spawnerPos);
-        Vec3d playerEye = player.getEyePos();
-
-        BlockHitResult hitResult = world.raycast(new RaycastContext(
+    private boolean hasLineOfSightToSpawner(ServerLevel level, BlockPos spawnerPos, ServerPlayer player) {
+        Vec3 spawnerCenter = Vec3.atCenterOf(spawnerPos);
+        Vec3 playerEye = player.getEyePosition();
+        BlockHitResult hitResult = level.clip(new ClipContext(
                 playerEye,
                 spawnerCenter,
-                RaycastContext.ShapeType.VISUAL,
-                RaycastContext.FluidHandling.NONE,
+                ClipContext.Block.VISUAL,
+                ClipContext.Fluid.NONE,
                 player
         ));
 
-        return hitResult.getBlockPos().equals(spawnerPos) || hitResult.getType() == net.minecraft.util.hit.HitResult.Type.MISS;
+        return hitResult.getBlockPos().equals(spawnerPos) || hitResult.getType() == net.minecraft.world.phys.HitResult.Type.MISS;
     }
 
     @Unique
-    private void sendNotificationsToUnauthorizedPlayers(ServerWorld world, BlockPos pos, List<ServerPlayerEntity> players) {
-        for (ServerPlayerEntity player : players) {
-            if (!RegionPermissionChecker.isAllowed(player, Rule.USE_TRIAL_MECHANICS, pos)) {
-                ServerPlayNetworking.send(player, new HudNotificationS2CPacket(
+    private void sendNotificationsToUnauthorizedPlayers(ServerLevel level, BlockPos pos, List<ServerPlayer> players) {
+        for (ServerPlayer player : players) {
+            if (!RegionPermissionChecker.isAllowed(player.getUUID(), Rule.USE_TRIAL_MECHANICS, pos, level)) {
+                ServerPlayNetworking.send(player, new HudNotificationS2CPacket( // TODO
                         NotificationType.DENY_USE_TRIAL_MECHANICS, Color.RED
                 ));
             }
@@ -106,11 +105,12 @@ public abstract class TrialSpawnerLogicProtectionMixin {
     }
 
     @Unique
-    private void forceSafeState(TrialSpawnerLogic logic, ServerWorld world, BlockPos pos) {
-        var currentState = logic.getSpawnerState();
+    private void forceSafeState(TrialSpawner spawner, ServerLevel level, BlockPos pos) {
+        TrialSpawnerState currentState = spawner.getState();
+
         if (currentState == TrialSpawnerState.ACTIVE || currentState == TrialSpawnerState.WAITING_FOR_REWARD_EJECTION) {
-            logic.setSpawnerState(world, TrialSpawnerState.WAITING_FOR_PLAYERS);
-            logic.updateListeners();
+            spawner.setState(level, TrialSpawnerState.INACTIVE);
+            spawner.markUpdated();
         }
     }
 }

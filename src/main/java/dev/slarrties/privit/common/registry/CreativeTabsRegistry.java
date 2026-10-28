@@ -1,14 +1,13 @@
 package dev.slarrties.privit.common.registry;
 
-import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
-import net.minecraft.item.ItemGroups;
-import net.minecraft.item.Items;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 
 public class CreativeTabsRegistry {
+
     public static void register() {
-        ItemGroupEvents.modifyEntriesEvent(ItemGroups.FUNCTIONAL).register(entries -> {
-            entries.add(Items.CRAFTING_TABLE);
-            entries.add(BlocksRegistry.REGION_TABLE);
+        CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.FUNCTIONAL_BLOCKS).register(output -> {
+            output.accept(BlocksRegistry.REGION_TABLE);
         });
     }
 

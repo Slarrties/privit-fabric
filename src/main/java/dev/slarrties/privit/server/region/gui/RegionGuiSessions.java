@@ -5,9 +5,9 @@ import dev.slarrties.privit.common.region.gui.state.RegionGuiState;
 import dev.slarrties.privit.server.region.Region;
 import dev.slarrties.privit.server.region.RegionManager;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Map;
 import java.util.UUID;
@@ -24,13 +24,13 @@ public final class RegionGuiSessions {
     private final Map<UUID, RegionGuiSession> sessions = new ConcurrentHashMap<>();
     private final Map<BlockPos, UUID> pendingByTable = new ConcurrentHashMap<>();
 
-    public RegionGuiSessions(ServerWorld world, RegionManager regionManager) {
+    public RegionGuiSessions(ServerLevel world, RegionManager regionManager) {
         this.regionManager = regionManager;
     }
 
-    public OpenResult open(ServerPlayerEntity player, BlockPos tablePos) {
+    public OpenResult open(ServerPlayer player, BlockPos tablePos) {
         Region existing = regionManager.getAt(tablePos).orElse(null);
-        if (existing != null && !existing.isOwner(player.getUuid())) {
+        if (existing != null && !existing.isOwner(player.getUUID())) {
             return new OpenResult.Denied(NotificationType.REGION_NOT_ACCEPTED);
         }
 
@@ -40,7 +40,7 @@ public final class RegionGuiSessions {
         return new OpenResult.Opened(session.state());
     }
 
-    public RegionGuiState ensureSession(ServerPlayerEntity player, BlockPos tablePos) {
+    public RegionGuiState ensureSession(ServerPlayer player, BlockPos tablePos) {
         Region existing = regionManager.getAt(tablePos).orElse(null);
         RegionGuiSession session = getOrCreate(tablePos, player, existing);
         session.addViewer(player);
@@ -87,7 +87,7 @@ public final class RegionGuiSessions {
         pendingByTable.clear();
     }
 
-    private RegionGuiSession getOrCreate(BlockPos tablePos, ServerPlayerEntity player, Region existing) {
+    private RegionGuiSession getOrCreate(BlockPos tablePos, ServerPlayer player, Region existing) {
         UUID regionId = existing != null
                 ? existing.id()
                 : pendingByTable.computeIfAbsent(tablePos, pos -> generateUniqueId());
@@ -97,7 +97,7 @@ public final class RegionGuiSessions {
                     ? RegionGuiMapping.fromRegion(existing, tablePos)
                     : RegionGuiState.createNew(
                     id,
-                    player.getUuid(),
+                    player.getUUID(),
                     tablePos,
                     player.getName().getString()
             );
@@ -110,7 +110,7 @@ public final class RegionGuiSessions {
 
             return new RegionGuiSession(
                     id,
-                    player.getServerWorld(),
+                    player.level(),
                     state,
                     regionManager,
                     existing == null ? tablePos : null

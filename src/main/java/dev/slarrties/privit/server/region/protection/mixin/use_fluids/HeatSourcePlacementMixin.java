@@ -7,17 +7,17 @@ import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.tracking.protection.CampfireOriginTracker;
 import dev.slarrties.privit.server.tracking.protection.HeatSourceOriginTracker;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.BlockState;
-import net.minecraft.world.World;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.state.property.Properties;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -29,32 +29,34 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class HeatSourcePlacementMixin {
 
     @Inject(
-            method = "place(Lnet/minecraft/item/ItemPlacementContext;)Lnet/minecraft/util/ActionResult;",
+            method = "place(Lnet/minecraft/world/item/context/BlockPlaceContext;)Lnet/minecraft/world/InteractionResult;",
             at = @At("RETURN")
     )
-    private void onHeatSourcePlaced(ItemPlacementContext context, CallbackInfoReturnable<ActionResult> cir) {
-        if (cir.getReturnValue() != ActionResult.SUCCESS && cir.getReturnValue() != ActionResult.CONSUME) return;
-        World world = context.getWorld();
-        if (world.isClient || !(world instanceof ServerWorld serverWorld)) return;
+    private void onHeatSourcePlaced(BlockPlaceContext context, CallbackInfoReturnable<InteractionResult> cir) {
+        InteractionResult result = cir.getReturnValue();
+        if (result != InteractionResult.SUCCESS && result != InteractionResult.CONSUME) return;
 
-        BlockPos pos = context.getBlockPos();
-        BlockState state = serverWorld.getBlockState(pos);
+        Level level = context.getLevel();
+        if (level.isClientSide() || !(level instanceof ServerLevel serverLevel)) return;
+
+        BlockPos pos = context.getClickedPos();
+        BlockState state = serverLevel.getBlockState(pos);
         Block block = state.getBlock();
 
         if (!HeatSources.isHeatSource(block)) return;
-        if (!(context.getPlayer() instanceof ServerPlayerEntity serverPlayer)) return;
-        if (state.isOf(Blocks.CAMPFIRE) || state.isOf(Blocks.SOUL_CAMPFIRE)) {
-            if (state.contains(Properties.LIT) && state.get(Properties.LIT)) {
-                CampfireOriginTracker campfireTracker = WorldRegistry.get(serverWorld)
+        if (!(context.getPlayer() instanceof ServerPlayer serverPlayer)) return;
+        if (state.is(Blocks.CAMPFIRE) || state.is(Blocks.SOUL_CAMPFIRE)) {
+            if (state.hasProperty(BlockStateProperties.LIT) && state.getValue(BlockStateProperties.LIT)) {
+                CampfireOriginTracker campfireTracker = WorldRegistry.get(serverLevel)
                         .getTrackerManager()
                         .getCampfireOriginTracker();
-                campfireTracker.record(pos, serverPlayer.getUuid());
+                campfireTracker.record(pos, serverPlayer.getUUID());
             }
         }
 
-        HeatSourceOriginTracker heatSourceTracker = WorldRegistry.get(serverWorld)
+        HeatSourceOriginTracker heatSourceTracker = WorldRegistry.get(serverLevel)
                 .getTrackerManager()
                 .getHeatSourceOriginTracker();
-        heatSourceTracker.record(pos, serverPlayer.getUuid());
+        heatSourceTracker.record(pos, serverPlayer.getUUID());
     }
 }

@@ -1,7 +1,7 @@
 package dev.slarrties.privit.server.tracking.context;
 
-import net.minecraft.util.math.BlockPos;
 import java.util.UUID;
+import net.minecraft.core.BlockPos;
 
 public final class BoneMealUseContext {
     private static final ThreadLocal<BoneMealUseContext> CURRENT = new ThreadLocal<>();

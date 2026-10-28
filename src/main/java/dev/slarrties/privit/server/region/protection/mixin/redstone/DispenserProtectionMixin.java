@@ -13,21 +13,30 @@ import dev.slarrties.privit.server.tracking.protection.FluidOriginTracker;
 import dev.slarrties.privit.server.tracking.redstone.DispenserEntityAssigner;
 import dev.slarrties.privit.server.tracking.redstone.handler.RedstoneReceiverHandler;
 
-import net.minecraft.item.*;
-import net.minecraft.block.*;
-import net.minecraft.block.entity.DispenserBlockEntity;
-import net.minecraft.fluid.FluidState;
-import net.minecraft.potion.Potions;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.registry.tag.BlockTags;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.passive.*;
-import net.minecraft.entity.decoration.ArmorStandEntity;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.*;
+import net.minecraft.world.item.alchemy.Potions;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.block.*;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.entity.DispenserBlockEntity;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.animal.pig.Pig;
+import net.minecraft.world.entity.animal.sheep.Sheep;
+import net.minecraft.world.entity.animal.camel.Camel;
+import net.minecraft.world.entity.animal.armadillo.Armadillo;
+import net.minecraft.world.entity.animal.equine.Mule;
+import net.minecraft.world.entity.animal.equine.Llama;
+import net.minecraft.world.entity.animal.equine.Donkey;
+import net.minecraft.world.entity.animal.equine.AbstractHorse;
+import net.minecraft.world.entity.monster.Strider;
+import net.minecraft.world.entity.decoration.ArmorStand;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -55,110 +64,85 @@ import java.util.UUID;
 @Mixin(DispenserBlock.class)
 public abstract class DispenserProtectionMixin {
 
+    @Unique
+    private static final ThreadLocal<ItemStack> DISPENSED_STACK = new ThreadLocal<>(); // TODO
+
     @Inject(
-            method = "dispense(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/block/BlockState;Lnet/minecraft/util/math/BlockPos;)V",
+            method = "dispenseFrom(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;)V",
             at = @At("HEAD"),
             cancellable = true
     )
-    private void onDispenseHead(ServerWorld serverWorld, BlockState state, BlockPos pos, CallbackInfo ci) {
-        if (!(serverWorld.getBlockEntity(pos) instanceof DispenserBlockEntity dispenser)) return;
+    private void onDispenseHead(ServerLevel level, BlockState state, BlockPos pos, CallbackInfo ci) {
+        if (!(level.getBlockEntity(pos) instanceof DispenserBlockEntity dispenser)) return;
 
-        int slot = dispenser.chooseNonEmptySlot(serverWorld.random);
+        int slot = dispenser.getRandomSlot(level.getRandom());
         if (slot < 0) return;
 
-        ItemStack stack = dispenser.getStack(slot);
-        Direction facing = state.get(DispenserBlock.FACING);
-        BlockPos targetPos = pos.offset(facing);
+        ItemStack stack = dispenser.getItem(slot);
+        DISPENSED_STACK.set(stack);
 
-        if (stack.isOf(Items.BONE_MEAL)) {
-            UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverWorld, pos);
+        Direction facing = state.getValue(DispenserBlock.FACING);
+        BlockPos targetPos = pos.relative(facing);
 
+        if (stack.is(Items.BONE_MEAL)) {
+            UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(level, pos);
             if (responsible != null) BoneMealUseContext.push(responsible, targetPos);
-            if (!RegionPermissionChecker.isAllowed(responsible, Rule.USE_BONE_MEAL, targetPos, serverWorld)) {
-                ServerPlayerEntity serverPlayer = serverWorld.getServer()
-                        .getPlayerManager()
-                        .getPlayer(responsible);
-                PlayerNotification.trySend(serverPlayer, NotificationType.DENY_USE_BONE_MEAL, Color.RED);
-                serverWorld.syncWorldEvent(1001, pos, 0);
-                BoneMealUseContext.pop();
-                ci.cancel();
-            }
 
+            if (!RegionPermissionChecker.isAllowed(responsible, Rule.USE_BONE_MEAL, targetPos, level)) {
+                sendDenyAndCancel(level, pos, responsible, NotificationType.DENY_USE_BONE_MEAL, ci);
+                BoneMealUseContext.pop();
+            }
             return;
         }
 
         Rule rule = getRuleForInstantCancel(stack);
-
         if (rule != null) {
-            UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverWorld, pos);
-
-            if (!RegionPermissionChecker.isAllowed(responsible, rule, targetPos, serverWorld)) {
-                ServerPlayerEntity serverPlayer = serverWorld.getServer()
-                        .getPlayerManager()
-                        .getPlayer(responsible);
-                PlayerNotification.trySend(serverPlayer, getNotificationType(rule), Color.RED);
-                serverWorld.syncWorldEvent(1001, pos, 0);
-                ci.cancel();
+            UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(level, pos);
+            if (!RegionPermissionChecker.isAllowed(responsible, rule, targetPos, level)) {
+                sendDenyAndCancel(level, pos, responsible, getNotificationType(rule), ci);
             }
-
             return;
         }
 
         if (isWaterBottle(stack)) {
-            BlockState targetState = serverWorld.getBlockState(targetPos);
+            BlockState targetState = level.getBlockState(targetPos);
 
-            if (targetState.isIn(BlockTags.CONVERTABLE_TO_MUD)) {
-                UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverWorld, pos);
-
-                if (!RegionPermissionChecker.isAllowed(responsible, Rule.BUILD, targetPos, serverWorld)) {
-                    ServerPlayerEntity serverPlayer = serverWorld.getServer()
-                            .getPlayerManager()
-                            .getPlayer(responsible);
-                    PlayerNotification.trySend(serverPlayer, NotificationType.DENY_PLACE_BLOCK, Color.RED);
-                    serverWorld.syncWorldEvent(1001, pos, 0);
-                    ci.cancel();
+            if (targetState.is(BlockTags.CONVERTABLE_TO_MUD)) {
+                UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(level, pos);
+                if (!RegionPermissionChecker.isAllowed(responsible, Rule.BUILD, targetPos, level)) {
+                    sendDenyAndCancel(level, pos, responsible, NotificationType.DENY_PLACE_BLOCK, ci);
                     return;
                 }
             }
         }
 
-        if (shouldCancelAnimalOrStandInteraction(stack, serverWorld, targetPos)) {
-            UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(serverWorld, pos);
+        if (shouldCancelAnimalOrStandInteraction(stack, level, targetPos)) {
+            UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(level, pos);
 
-            if (!RegionPermissionChecker.isAllowed(responsible, Rule.INTERACT_WITH_ANIMALS, targetPos, serverWorld)) {
-                ServerPlayerEntity serverPlayer = serverWorld.getServer()
-                        .getPlayerManager()
-                        .getPlayer(responsible);
-                PlayerNotification.trySend(serverPlayer, NotificationType.DENY_ANIMAL_TAME_AND_BREED, Color.RED);
-                serverWorld.syncWorldEvent(1001, pos, 0);
-                ci.cancel();
+            if (!RegionPermissionChecker.isAllowed(responsible, Rule.ATTACK_PASSIVE_MOBS, targetPos, level)) {
+                sendDenyAndCancel(level, pos, responsible, NotificationType.DENY_ANIMAL_TAME_AND_BREED, ci);
             }
         }
     }
 
     @Inject(
-            method = "dispense(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/block/BlockState;Lnet/minecraft/util/math/BlockPos;)V",
+            method = "dispenseFrom(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;)V",
             at = @At("TAIL")
     )
-    private void onDispenseTail(ServerWorld world, BlockState state, BlockPos pos, CallbackInfo ci) {
-        if (!(world.getBlockEntity(pos) instanceof DispenserBlockEntity dispenser)) return;
+    private void onDispenseTail(ServerLevel level, BlockState state, BlockPos pos, CallbackInfo ci) {
+        ItemStack stack = DISPENSED_STACK.get();
+        DISPENSED_STACK.remove();
+        if (stack == null || stack.isEmpty()) return;
 
-        int slot = dispenser.chooseNonEmptySlot(world.random);
-        if (slot < 0) return;
+        Direction facing = state.getValue(DispenserBlock.FACING);
+        BlockPos targetPos = pos.relative(facing);
 
-        ItemStack stack = dispenser.getStack(slot);
-        Direction facing = state.get(DispenserBlock.FACING);
-        BlockPos targetPos = pos.offset(facing);
-        UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(world, pos);
-
+        UUID responsible = RedstoneReceiverHandler.findResponsiblePlayer(level, pos);
         if (responsible == null) return;
-        if (stack.isOf(Items.FLINT_AND_STEEL)) {
-            BlockState targetState = world.getBlockState(targetPos);
-
-            if (targetState.getBlock() instanceof FireBlock ||
-                    targetState.isIn(BlockTags.FIRE) ||
-                    targetState.isOf(Blocks.SOUL_FIRE)) {
-                FireOriginTracker fireTracker = WorldRegistry.get(world)
+        if (stack.is(Items.FLINT_AND_STEEL)) {
+            BlockState targetState = level.getBlockState(targetPos);
+            if (targetState.is(Blocks.FIRE) || targetState.is(BlockTags.FIRE) || targetState.is(Blocks.SOUL_FIRE)) {
+                FireOriginTracker fireTracker = WorldRegistry.get(level)
                         .getTrackerManager()
                         .getFireOriginTracker();
                 fireTracker.record(targetPos, responsible);
@@ -166,30 +150,39 @@ public abstract class DispenserProtectionMixin {
         }
 
         if (stack.getItem() instanceof BucketItem) {
-            FluidState fluidState = world.getFluidState(targetPos);
-            BlockState blockState = world.getBlockState(targetPos);
-            boolean hasFluid = !fluidState.isEmpty() || (blockState.getBlock() instanceof Waterloggable && blockState.getFluidState().isStill());
-
+            FluidState fluidState = level.getFluidState(targetPos);
+            BlockState blockState = level.getBlockState(targetPos);
+            boolean hasFluid = !fluidState.isEmpty() || (blockState.getBlock() instanceof BucketPickup && blockState.getFluidState().isSource());
             if (hasFluid) {
-                FluidOriginTracker fluidOriginTracker = WorldRegistry.get(world)
+                FluidOriginTracker fluidOriginTracker = WorldRegistry.get(level)
                         .getTrackerManager()
                         .getFluidOriginTracker();
                 fluidOriginTracker.record(targetPos, responsible);
             }
         }
 
-        DispenserEntityAssigner.assignOwner(world, pos, null, stack);
+        DispenserEntityAssigner.assignOwner(level, pos, null, stack);
     }
 
-    @Inject(method = "dispense(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/block/BlockState;Lnet/minecraft/util/math/BlockPos;)V",
-            at = @At("RETURN"))
-    private void popBoneMealContext(ServerWorld world, BlockState state, BlockPos pos, CallbackInfo ci) {
+    @Inject(
+            method = "dispenseFrom(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;)V",
+            at = @At("RETURN")
+    )
+    private void popBoneMealContext(ServerLevel level, BlockState state, BlockPos pos, CallbackInfo ci) {
         BoneMealUseContext.pop();
     }
 
     @Unique
-    private boolean shouldCancelAnimalOrStandInteraction(ItemStack stack, ServerWorld world, BlockPos targetPos) {
-        var entities = world.getEntitiesByClass(Entity.class, new Box(targetPos), e -> true);
+    private void sendDenyAndCancel(ServerLevel level, BlockPos pos, UUID responsible, NotificationType type, CallbackInfo ci) {
+        level.levelEvent(1001, pos, 0);
+        ServerPlayer serverPlayer = level.getServer().getPlayerList().getPlayer(responsible);
+        PlayerNotification.trySend(serverPlayer, type, Color.RED);
+        ci.cancel();
+    }
+
+    @Unique
+    private boolean shouldCancelAnimalOrStandInteraction(ItemStack stack, ServerLevel level, BlockPos targetPos) {
+        var entities = level.getEntitiesOfClass(Entity.class, new AABB(targetPos), e -> true);
 
         for (Entity entity : entities) {
             if (matchesAnimalOrStandInteraction(entity, stack)) {
@@ -201,60 +194,55 @@ public abstract class DispenserProtectionMixin {
 
     @Unique
     private boolean matchesAnimalOrStandInteraction(Entity entity, ItemStack stack) {
-        if (entity instanceof SheepEntity && stack.isOf(Items.SHEARS)) return true;
-
-        if (entity instanceof ArmadilloEntity && stack.isOf(Items.BRUSH)) return true;
-
-        if (entity instanceof AbstractHorseEntity ||
-                entity instanceof PigEntity ||
-                entity instanceof StriderEntity ||
-                entity instanceof CamelEntity) {
-
-            if (stack.isOf(Items.SADDLE)) return true;
-            if (stack.isOf(Items.LEATHER_HORSE_ARMOR) ||
-                    stack.isOf(Items.IRON_HORSE_ARMOR) ||
-                    stack.isOf(Items.GOLDEN_HORSE_ARMOR) ||
-                    stack.isOf(Items.DIAMOND_HORSE_ARMOR)) {
+        if (entity instanceof Sheep && stack.is(Items.SHEARS)) return true;
+        if (entity instanceof Armadillo && stack.is(Items.BRUSH)) return true;
+        if (entity instanceof AbstractHorse ||
+                entity instanceof Pig ||
+                entity instanceof Strider ||
+                entity instanceof Camel) {
+            if (stack.is(Items.SADDLE)) return true;
+            if (stack.is(Items.LEATHER_HORSE_ARMOR) ||
+                    stack.is(Items.IRON_HORSE_ARMOR) ||
+                    stack.is(Items.GOLDEN_HORSE_ARMOR) ||
+                    stack.is(Items.DIAMOND_HORSE_ARMOR)) {
                 return true;
             }
         }
 
-        if (entity instanceof LlamaEntity &&
+        if (entity instanceof Llama &&
                 stack.getItem() instanceof BlockItem bi && bi.getBlock() instanceof CarpetBlock) {
             return true;
         }
 
-        if ((entity instanceof LlamaEntity || entity instanceof DonkeyEntity || entity instanceof MuleEntity)
-                && stack.isOf(Items.CHEST)) {
+        if ((entity instanceof Llama || entity instanceof Donkey || entity instanceof Mule)
+                && stack.is(Items.CHEST)) {
             return true;
         }
 
-        if (entity instanceof ArmorStandEntity) {
-            if (stack.getItem() instanceof ArmorItem ||
-                    stack.isOf(Items.ELYTRA) ||
-                    stack.isOf(Items.CARVED_PUMPKIN) ||
+        if (entity instanceof ArmorStand) {
+            if (stack.has(DataComponents.EQUIPPABLE) ||
+                    stack.is(Items.ELYTRA) ||
+                    stack.is(Items.CARVED_PUMPKIN) ||
                     stack.getItem() instanceof BlockItem bi && bi.getBlock() instanceof AbstractSkullBlock ||
-                    stack.isOf(Items.SHIELD)) {
+                    stack.is(Items.SHIELD)) {
                 return true;
             }
         }
-
         return false;
     }
 
     @Unique
     private static boolean isWaterBottle(ItemStack stack) {
         if (!(stack.getItem() instanceof PotionItem)) return false;
+        var contents = stack.get(DataComponents.POTION_CONTENTS);
+        if (contents == null) return false;
 
-        var contents = stack.get(DataComponentTypes.POTION_CONTENTS);
-        if (contents == null || contents.potion().isEmpty()) return false;
-
-        return contents.potion().get().matchesKey(Potions.WATER.getKey().orElseThrow());
+        return contents.is(Potions.WATER);
     }
 
     @Unique
     private static Rule getRuleForInstantCancel(ItemStack stack) {
-        if (stack.isOf(Items.FLINT_AND_STEEL)) return Rule.USE_FIRE_STARTERS;
+        if (stack.is(Items.FLINT_AND_STEEL)) return Rule.USE_FIRE_STARTERS;
         if (stack.getItem() instanceof SpawnEggItem) return Rule.USE_SPAWN_EGGS;
         if (stack.getItem() instanceof BoatItem) return Rule.INTERACT_WITH_BOATS;
         if (stack.getItem() instanceof MinecartItem) return Rule.INTERACT_WITH_MINECARTS;

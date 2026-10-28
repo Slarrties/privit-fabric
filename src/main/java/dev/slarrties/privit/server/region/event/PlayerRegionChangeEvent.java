@@ -4,7 +4,7 @@ import dev.slarrties.privit.server.region.Region;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -21,7 +21,7 @@ public final class PlayerRegionChangeEvent {
 
     @FunctionalInterface
     public interface Changed {
-        void onRegionChanged(ServerPlayerEntity player,
+        void onRegionChanged(ServerPlayer player,
                              @Nullable Region from,
                              @Nullable Region to);
     }

@@ -5,9 +5,9 @@ import dev.slarrties.privit.common.region.RegionGroups;
 import dev.slarrties.privit.common.region.gui.state.RegionGuiState;
 import dev.slarrties.privit.common.network.payload.s2c.RegionGuiUpdateS2CPacket;
 
-import net.minecraft.util.math.BlockBox;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.core.BlockPos;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
 import java.util.List;
 import java.util.UUID;
@@ -15,9 +15,9 @@ import java.util.UUID;
 public record RegionGuiLocalState(
         UUID id,
         String name,
-        BlockBox realBounds,
-        BlockBox draftBounds,
-        List<BlockBox> conflictBounds,
+        BoundingBox realBounds,
+        BoundingBox draftBounds,
+        List<BoundingBox> conflictBounds,
         BlockPos pivotPos,
         Color color,
         RegionGroups groups,
@@ -25,7 +25,6 @@ public record RegionGuiLocalState(
         boolean isChanged,
         boolean isAreaLimitExceeded
 ) {
-
     public static RegionGuiLocalState from(RegionGuiState state) {
         return new RegionGuiLocalState(
                 state.getId(),
@@ -65,14 +64,12 @@ public record RegionGuiLocalState(
                 this.pivotPos(),
                 this.getOwnerName()
         );
-
         state.setName(this.name());
         state.setColor(this.color());
         state.setDraftBounds(this.draftBounds());
         state.setConflictBounds(this.conflictBounds());
         state.setPivotPos(this.pivotPos());
         state.applyGroups(this.groups());
-
         return state;
     }
 
@@ -85,8 +82,8 @@ public record RegionGuiLocalState(
 
     // TODO: change to NameProvider?
     public String getOwnerName() {
-        return MinecraftClient.getInstance().player != null
-                ? MinecraftClient.getInstance().player.getName().getString()
+        return Minecraft.getInstance().player != null
+                ? Minecraft.getInstance().player.getName().getString()
                 : "Unknown";
     }
 }

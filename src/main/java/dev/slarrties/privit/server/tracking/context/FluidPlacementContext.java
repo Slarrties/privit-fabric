@@ -1,21 +1,21 @@
 package dev.slarrties.privit.server.tracking.context;
 
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
 public final class FluidPlacementContext {
 
     private static final ThreadLocal<FluidPlacementContext> CURRENT = new ThreadLocal<>();
-    private final ServerPlayerEntity player;
+    private final ServerPlayer player;
     private final BlockPos pos;
 
-    private FluidPlacementContext(ServerPlayerEntity player, BlockPos pos) {
+    private FluidPlacementContext(ServerPlayer player, BlockPos pos) {
         this.player = player;
         this.pos = pos;
     }
 
-    public static void push(ServerPlayerEntity player, BlockPos pos) {
+    public static void push(ServerPlayer player, BlockPos pos) {
         if (player == null || pos == null) return;
         CURRENT.set(new FluidPlacementContext(player, pos));
     }
@@ -29,7 +29,7 @@ public final class FluidPlacementContext {
         return CURRENT.get();
     }
 
-    public ServerPlayerEntity getPlayer() {
+    public ServerPlayer getPlayer() {
         return player;
     }
 

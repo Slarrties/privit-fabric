@@ -1,22 +1,21 @@
 package dev.slarrties.privit.server.region.protection.mixin.spread_sculk;
 
 import dev.slarrties.privit.common.region.rule.Rule;
-import dev.slarrties.privit.server.tracking.context.SculkCursorDuck;
+import dev.slarrties.privit.server.tracking.context.SculkBloomContext;
 import dev.slarrties.privit.server.region.protection.AssociatedRule;
 import dev.slarrties.privit.server.region.protection.RegionPermissionChecker;
 
-import net.minecraft.world.WorldAccess;
-import net.minecraft.block.SculkBlock;
-import net.minecraft.block.entity.SculkSpreadManager;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.SculkBlock;
+import net.minecraft.world.level.block.SculkSpreader;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import com.llamalad7.mixinextras.sugar.Local;
 
 import java.util.UUID;
 
@@ -25,33 +24,31 @@ import java.util.UUID;
 public abstract class SculkBlockMixin {
 
     @Inject(
-            method = "spread",
+            method = "attemptUseCharge",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/world/WorldAccess;setBlockState(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;I)Z"
+                    target = "Lnet/minecraft/world/level/LevelAccessor;setBlock(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;I)Z"
             ),
             cancellable = true
     )
     private void onPlaceExtraBlock(
-            SculkSpreadManager.Cursor cursor,
-            WorldAccess world,
-            BlockPos catalystPos,
-            Random random,
-            SculkSpreadManager spreadManager,
-            boolean shouldConvertToBlock,
-            CallbackInfoReturnable<Integer> cir,
-            @Local(ordinal = 1) BlockPos blockPos2
+            SculkSpreader.ChargeCursor cursor,
+            LevelAccessor level,
+            BlockPos originPos,
+            RandomSource random,
+            SculkSpreader spreader,
+            boolean spreadVein,
+            CallbackInfoReturnable<Integer> cir
     ) {
-        if (!(world instanceof ServerWorld serverWorld)) return;
-        if (!(cursor instanceof SculkCursorDuck duck)) return;
-
-        UUID responsible = duck.getResponsible();
+        if (!(level instanceof ServerLevel serverLevel)) return;
+        UUID responsible = SculkBloomContext.getResponsible();
         if (responsible == null) return;
+        BlockPos growthPlacement = cursor.getPos().above();
 
-        boolean allowed = RegionPermissionChecker.isAllowed(responsible, Rule.SPREAD_SCULK, blockPos2, serverWorld);
-
-        if (!allowed) {
-            cir.setReturnValue(Math.max(0, cursor.getCharge() - spreadManager.getExtraBlockChance()));
+        if (!RegionPermissionChecker.isAllowed(responsible, Rule.SPREAD_SCULK, growthPlacement, serverLevel)) {
+            int charge = cursor.getCharge();
+            int xpPerGrowthSpawn = spreader.growthSpawnCost();
+            cir.setReturnValue(Math.max(0, charge - xpPerGrowthSpawn));
         }
     }
 }

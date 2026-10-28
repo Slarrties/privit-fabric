@@ -1,64 +1,59 @@
 package dev.slarrties.privit.server.region.util;
 
-import net.minecraft.util.Hand;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.network.packet.s2c.play.InventoryS2CPacket;
-import net.minecraft.network.packet.s2c.play.ScreenHandlerSlotUpdateS2CPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket;
+import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
 
 public final class InventorySyncSystem {
 
     private InventorySyncSystem() {}
 
-    public static void syncHandSlot(ServerPlayerEntity player, Hand hand) {
-        if (player == null || player.networkHandler == null) return;
+    public static void syncHandSlot(ServerPlayer player, InteractionHand hand) {
+        if (player == null) return;
 
-        ItemStack stackInHand = player.getStackInHand(hand);
+        ItemStack stackInHand = player.getItemInHand(hand);
         int slotId = handSlotId(player, hand);
-
-        player.networkHandler.sendPacket(new ScreenHandlerSlotUpdateS2CPacket(
-                player.currentScreenHandler.syncId,
+        player.connection.send(new ClientboundContainerSetSlotPacket(
+                player.containerMenu.containerId,
                 0,
                 slotId,
                 stackInHand.copy()
         ));
     }
 
-    public static void syncHandSlotStrong(ServerPlayerEntity player, Hand hand) {
-        if (player == null || player.networkHandler == null) return;
+    public static void syncHandSlotStrong(ServerPlayer player, InteractionHand hand) {
+        if (player == null) return;
 
-        ItemStack stackInHand = player.getStackInHand(hand).copy();
+        ItemStack stackInHand = player.getItemInHand(hand).copy();
         int slotId = handSlotId(player, hand);
-
-        player.networkHandler.sendPacket(new ScreenHandlerSlotUpdateS2CPacket(
-                player.currentScreenHandler.syncId,
+        player.connection.send(new ClientboundContainerSetSlotPacket(
+                player.containerMenu.containerId,
                 0,
                 slotId,
                 stackInHand
         ));
-
-        player.currentScreenHandler.sendContentUpdates();
-
-        player.networkHandler.sendPacket(new InventoryS2CPacket(
-                player.currentScreenHandler.syncId,
+        player.containerMenu.broadcastChanges();
+        player.connection.send(new ClientboundContainerSetContentPacket(
+                player.containerMenu.containerId,
                 0,
-                player.currentScreenHandler.getStacks(),
-                player.currentScreenHandler.getCursorStack()
+                player.containerMenu.getItems(),
+                player.containerMenu.getCarried()
         ));
-
-        player.getInventory().markDirty();
+        player.getInventory().setChanged();
     }
 
-    public static void syncFullInventory(ServerPlayerEntity player) {
-        if (player == null || player.networkHandler == null) return;
-        player.currentScreenHandler.syncState();
-        player.getInventory().markDirty();
+    public static void syncFullInventory(ServerPlayer player) {
+        if (player == null) return;
+
+        player.containerMenu.broadcastChanges();
+        player.getInventory().setChanged();
     }
 
-    private static int handSlotId(ServerPlayerEntity player, Hand hand) {
-        // Hotbar: 36–44, Offhand: 45
-        return (hand == Hand.MAIN_HAND)
-                ? player.getInventory().selectedSlot + 36
+    private static int handSlotId(ServerPlayer player, InteractionHand hand) {
+        return (hand == InteractionHand.MAIN_HAND)
+                ? player.getInventory().getSelectedSlot() + 36 // TODO: it may work incorrect
                 : 45;
     }
 }
